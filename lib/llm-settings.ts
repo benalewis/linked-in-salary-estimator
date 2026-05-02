@@ -3,33 +3,29 @@ import { upgradeDeprecatedGeminiModel } from '@/lib/llm-gemini-model';
 import { mergeLlmPatch } from '@/lib/llm-patch';
 import {
   DEFAULT_LLM_SETTINGS,
-  type LlmProviderId,
   type LlmSettingsView,
   type LlmStoredSettings,
 } from '@/lib/llm-types';
 
 export const LLM_SETTINGS_KEY = 'lseLlmSettings' as const;
 
-export type { LlmProviderId, LlmSettingsView, LlmStoredSettings };
+export type { LlmSettingsView, LlmStoredSettings };
 export { DEFAULT_LLM_SETTINGS };
 export { mergeLlmPatch } from '@/lib/llm-patch';
 
+/** Legacy blobs may contain `providerId` / OpenAI keys — ignored; only Gemini fields are kept. */
 function normalizeStored(raw: unknown): LlmStoredSettings {
   if (!raw || typeof raw !== 'object') {
     return { ...DEFAULT_LLM_SETTINGS };
   }
   const o = raw as Partial<LlmStoredSettings>;
-  const pid: LlmProviderId = o.providerId === 'openai' ? 'openai' : 'gemini';
   const geminiModelRaw =
     typeof o.geminiModel === 'string' && o.geminiModel.trim().length > 0
       ? o.geminiModel.trim()
       : DEFAULT_LLM_SETTINGS.geminiModel;
   return {
-    providerId: pid,
     geminiApiKey: typeof o.geminiApiKey === 'string' ? o.geminiApiKey : '',
     geminiModel: upgradeDeprecatedGeminiModel(geminiModelRaw),
-    openaiApiKey: typeof o.openaiApiKey === 'string' ? o.openaiApiKey : '',
-    openaiModel: typeof o.openaiModel === 'string' ? o.openaiModel : DEFAULT_LLM_SETTINGS.openaiModel,
   };
 }
 
@@ -55,11 +51,8 @@ export async function writeLlmSettingsFull(s: LlmStoredSettings): Promise<void> 
 
 export function toLlmSettingsView(s: LlmStoredSettings): LlmSettingsView {
   return {
-    providerId: s.providerId,
     geminiModel: s.geminiModel,
-    openaiModel: s.openaiModel,
     geminiKeyConfigured: Boolean(s.geminiApiKey.trim()),
-    openaiKeyConfigured: Boolean(s.openaiApiKey.trim()),
   };
 }
 

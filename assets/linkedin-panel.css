@@ -3,15 +3,17 @@
   box-sizing: border-box;
   display: block;
   position: relative;
-  /* Stay within the text column; avoid painting over the adjacent LinkedIn layout column */
+  isolation: isolate;
+  /* Stay within Experience text column — avoid greedily stretching flex tracks that bleed into sibling modules */
   z-index: 1;
   width: 100%;
   max-width: min(400px, 100%);
   margin-top: 12px;
   margin-left: 0;
   margin-right: auto;
-  align-self: stretch;
-  flex: 1 1 100%;
+  align-self: flex-start;
+  flex: 0 1 auto;
+  min-width: 0;
   min-height: 0;
   padding: 10px 12px;
   border-radius: 8px;
@@ -55,10 +57,70 @@
   color: rgba(0, 0, 0, 0.88);
 }
 
-.lse-panel__note {
-  margin: 8px 0 0;
+.lse-panel__explain {
+  position: relative;
+  margin-top: 10px;
+  padding-top: 2px;
+}
+
+.lse-panel__explain-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+  font-weight: 500;
+  color: rgba(37, 99, 235, 0.95);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.lse-panel__explain-toggle:hover {
+  color: rgba(29, 78, 216, 0.98);
+}
+
+.lse-panel__explain-toggle:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.45);
+  outline-offset: 2px;
+}
+
+.lse-panel__explain-body {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  width: max-content;
+  max-width: min(380px, 92vw);
+  max-height: min(240px, 45vh);
+  overflow: auto;
+  padding: 10px 12px;
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: #fff;
+  color: rgba(0, 0, 0, 0.75);
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.lse-panel__explain-body:focus {
+  outline: none;
+}
+
+.lse-panel__note {
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+  color: rgba(0, 0, 0, 0.55);
 }
 
 .lse-panel--busy {
@@ -66,7 +128,7 @@
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.08);
 }
 
-.lse-panel--busy .lse-panel__note {
+.lse-panel--busy .lse-panel__explain {
   display: none;
 }
 
@@ -180,8 +242,29 @@
     color: rgba(255, 255, 255, 0.92);
   }
 
+  .lse-panel__explain-toggle {
+    color: rgba(147, 197, 253, 0.98);
+  }
+
+  .lse-panel__explain-toggle:hover {
+    color: rgba(191, 219, 254, 1);
+  }
+
+  .lse-panel__explain-toggle:focus-visible {
+    outline-color: rgba(147, 197, 253, 0.55);
+  }
+
+  .lse-panel__explain-body {
+    background: #2a3036;
+    border-color: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.82);
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.45),
+      0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+
   .lse-panel__note {
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.55);
   }
 
   .lse-panel--busy {

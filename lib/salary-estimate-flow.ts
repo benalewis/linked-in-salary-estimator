@@ -30,6 +30,7 @@ export const LLM_FLOW_LOG_PREFIX = '[salary-estimator][llm-flow]' as const;
 /** Named phases for grep-friendly logs (not an exhaustive enum of every branch). */
 export type SalaryEstimateFlowPhase =
   | 'content:estimate_start'
+  | 'content:estimate_cache_hit'
   | 'content:estimate_payload'
   | 'content:estimate_worker_send'
   | 'content:estimate_worker_response'

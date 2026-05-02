@@ -1,5 +1,6 @@
 import '@/assets/linkedin-panel.css';
 import browser from '@/lib/browser';
+import { extensionContextIsStale, formatExtensionSideError } from '@/lib/extension-context';
 import { LSE_SETTINGS_KEY, type LseSettings } from '@/lib/lse-settings';
 import type { InjectionResult } from '@/lib/linkedin-panel';
 import {
@@ -9,9 +10,15 @@ import {
   collectSalaryEstimateContext,
   mutationsAreOnlyInsideSalaryPanel,
   removeSalaryPanel,
+  resolveExperienceHostFromSalaryPanel,
   tryInjectSalaryPanel,
 } from '@/lib/linkedin-panel';
+import { friendlyLlmErrorMessage } from '@/lib/llm-user-errors';
 import { logLlmFlow } from '@/lib/salary-estimate-flow';
+import {
+  readCachedSalaryEstimate,
+  writeCachedSalaryEstimate,
+} from '@/lib/salary-estimate-cache';
 import type { SalaryEstimateInput, SalaryEstimateWorkerResult } from '@/lib/salary-estimate-types';
 import { lseDbg, lseDebugEnabled } from '@/lib/lse-debug';
 
@@ -81,17 +88,47 @@ export default defineContentScript({
       let mo!: MutationObserver;
 
       async function requestSalaryEstimate(panelEl: HTMLElement, ccy: string): Promise<void> {
-        const experienceLi = panelEl.closest('li');
-        if (!(experienceLi instanceof HTMLElement)) {
+        const experienceRow = resolveExperienceHostFromSalaryPanel(panelEl);
+        if (!(experienceRow instanceof HTMLElement)) {
           return;
         }
+        if (extensionContextIsStale()) {
+          if (panelEl.isConnected) {
+            applySalaryPanelError(panelEl, formatExtensionSideError('Extension context invalidated.'));
+            panelEl.dataset.lseEstimateState = 'error';
+          }
+          return;
+        }
+        const profileHref = location.href;
+        const rowTextForCache = (experienceRow.innerText ?? '').replace(/\s+/g, ' ').trim();
         const requestId = newEstimateRequestId();
         panelEl.dataset.lseRequestId = requestId;
+
+        try {
+          const cached = await readCachedSalaryEstimate(profileHref, rowTextForCache, ccy);
+          if (cached) {
+            if (panelEl.isConnected) {
+              applySalaryEstimateToPanel(panelEl, cached, ccy);
+              panelEl.dataset.lseEstimateState = 'ok';
+              logLlmFlow('content:estimate_cache_hit', {
+                requestId,
+                displayCurrency: ccy,
+                salaryLow: cached.salaryLow,
+                salaryHigh: cached.salaryHigh,
+              });
+              logLlmFlow('content:estimate_apply_success', { requestId, fromCache: true });
+            }
+            return;
+          }
+        } catch (e) {
+          console.warn('[salary-estimator] estimate cache read failed', e);
+        }
+
         logLlmFlow('content:estimate_start', { requestId, displayCurrency: ccy });
         const endBusy = beginSalaryPanelBusy(panelEl);
         try {
           const payload: SalaryEstimateInput = {
-            ...collectSalaryEstimateContext(experienceLi, ccy),
+            ...collectSalaryEstimateContext(experienceRow, ccy),
             requestId,
           };
           logLlmFlow('content:estimate_payload', {
@@ -119,14 +156,20 @@ export default defineContentScript({
             applySalaryEstimateToPanel(panelEl, res.estimate, ccy);
             panelEl.dataset.lseEstimateState = 'ok';
             logLlmFlow('content:estimate_apply_success', { requestId });
+            try {
+              await writeCachedSalaryEstimate(profileHref, rowTextForCache, ccy, res.estimate);
+            } catch (e) {
+              console.warn('[salary-estimator] estimate cache write failed', e);
+            }
           } else {
-            applySalaryPanelError(panelEl, res.error);
+            applySalaryPanelError(panelEl, friendlyLlmErrorMessage(res.error));
             panelEl.dataset.lseEstimateState = 'error';
             logLlmFlow('content:estimate_apply_error', { requestId, error: res.error }, 'warn');
           }
         } catch (e) {
           endBusy();
-          const err = e instanceof Error ? e.message : String(e);
+          const raw = e instanceof Error ? e.message : String(e);
+          const err = friendlyLlmErrorMessage(formatExtensionSideError(raw));
           logLlmFlow('content:estimate_runtime_error', { requestId, error: err }, 'warn');
           if (panelEl.isConnected) {
             applySalaryPanelError(panelEl, err);
@@ -152,7 +195,12 @@ export default defineContentScript({
           }
           console.info('[salary-estimator] currency label', displayCurrencyCode);
         } catch (e) {
-          console.warn('[salary-estimator] getSettings failed — using USD for panel until background responds', e);
+          const msg = e instanceof Error ? e.message : String(e);
+          if (/extension context invalidated/i.test(msg)) {
+            console.warn('[salary-estimator] extension context invalidated — refresh this LinkedIn tab after reloading the extension.', e);
+          } else {
+            console.warn('[salary-estimator] getSettings failed — using USD for panel until background responds', e);
+          }
           displayCurrencyCode = 'USD';
         }
         currencyResolved = true;
@@ -213,28 +261,26 @@ export default defineContentScript({
       scheduleInject();
 
       let lastHref = location.href;
-      const onMaybeNavigate = () => {
-        if (location.href !== lastHref) {
-          lastHref = location.href;
-          logActive();
-          lastInjectDigest = '';
-          removeSalaryPanel();
+      function hrefChangedSweep(): boolean {
+        if (location.href === lastHref) {
+          return false;
         }
+        lastHref = location.href;
+        logActive();
+        lastInjectDigest = '';
+        removeSalaryPanel();
+        return true;
+      }
+      /** `popstate` always re-schedules (LinkedIn SPA); poll only when hash/path actually moved. */
+      window.addEventListener('popstate', () => {
+        hrefChangedSweep();
         scheduleInject();
-      };
-
-      window.addEventListener('popstate', onMaybeNavigate);
-
-      const hrefPoll = () => {
-        if (location.href !== lastHref) {
-          lastHref = location.href;
-          logActive();
-          lastInjectDigest = '';
-          removeSalaryPanel();
+      });
+      setInterval(() => {
+        if (hrefChangedSweep()) {
           scheduleInject();
         }
-      };
-      setInterval(hrefPoll, 1000);
+      }, 1000);
     } catch (e) {
       console.error('[salary-estimator] content script failed to start', e);
     }

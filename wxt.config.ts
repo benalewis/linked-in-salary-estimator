@@ -5,14 +5,9 @@ export default defineConfig({
   manifest: () => ({
     name: 'LinkedIn Salary Estimator',
     description:
-      'Shows estimated salary range and total compensation next to the current role on LinkedIn profiles.',
+      'Shows estimated salary range and total compensation (base, bonus, stock) next to the current role on LinkedIn profiles.',
     permissions: ['storage'],
-    host_permissions: [
-      'https://ipapi.co/*',
-      'https://ipwho.is/*',
-      'https://generativelanguage.googleapis.com/*',
-      'https://api.openai.com/*',
-    ],
+    host_permissions: ['https://generativelanguage.googleapis.com/*'],
   }),
   // Firefox policy warning (data collection) — review before AMO submit:
   // https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/

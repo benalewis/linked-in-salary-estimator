@@ -1,9 +1,16 @@
 /** In-page salary estimate panel for LinkedIn profile Experience (DOM varies; selectors are best-effort). */
 
 import { formatMoney, normalizeCurrencyCode } from '@/lib/currencies';
+import { queryLinkedInProfileMain } from '@/lib/linkedin-main-root';
+import { scrapeLinkedInProfileSections } from '@/lib/linkedin-profile-scrape';
 import type { SalaryEstimateInput, SalaryEstimateParsed } from '@/lib/salary-estimate-types';
 
 export const LSE_PANEL_ATTR = 'data-lse-salary-panel';
+
+const explainPopoverDocListeners = new WeakMap<HTMLElement, AbortController>();
+
+/** Modern LinkedIn Experience feed uses stacked entity cards keyed by LinkedIn internals (often `div`s, not `ul > li`). */
+const EXPERIENCE_ENTITY_CARD_SEL = '[componentkey^="entity-collection-item"]';
 
 export type InjectionResult = {
   success: boolean;
@@ -11,16 +18,20 @@ export type InjectionResult = {
     | 'injected'
     | 'not_profile_path'
     | 'no_experience_section'
-    | 'no_list_items'
-    | 'no_present_role'
-    | 'present_too_short';
+    | 'no_list_items';
   details: Record<string, unknown>;
   /** Set when the panel was inserted successfully (use for follow-up LLM updates). */
   panelEl: HTMLElement | null;
 };
 
 export function removeSalaryPanel(): void {
-  document.querySelectorAll(`[${LSE_PANEL_ATTR}]`).forEach((el) => el.remove());
+  document.querySelectorAll(`[${LSE_PANEL_ATTR}]`).forEach((el) => {
+    if (el instanceof HTMLElement) {
+      explainPopoverDocListeners.get(el)?.abort();
+      explainPopoverDocListeners.delete(el);
+    }
+    el.remove();
+  });
 }
 
 function nodeIsInsideSalaryPanel(node: Node): boolean {
@@ -54,6 +65,25 @@ export function isProfilePath(): boolean {
   return /^\/in\/[^/]+/i.test(location.pathname);
 }
 
+/**
+ * True when `element` sits inside LinkedIn's profile **Experience** block (heading or #experience anchor),
+ * so we never mount the salary panel beside Education, Featured, etc.
+ */
+export function profileExperienceSectionContains(element: HTMLElement): boolean {
+  for (const sel of ['#experience', '[id="experience"]', '[data-section="experience"]'] as const) {
+    const anchor = document.querySelector(sel);
+    const sec = anchor?.closest('section');
+    if (sec instanceof HTMLElement && sec.contains(element)) {
+      return true;
+    }
+  }
+  const byHeading = [...document.querySelectorAll('section')].find((sec) => {
+    const t = sec.querySelector('h2, h3')?.textContent?.trim() ?? '';
+    return /^\s*experience\s*$/i.test(t);
+  });
+  return byHeading instanceof HTMLElement && byHeading.contains(element);
+}
+
 export function tryInjectSalaryPanel(displayCurrencyCode: string): InjectionResult {
   const details: Record<string, unknown> = {
     path: location.pathname,
@@ -81,35 +111,27 @@ export function tryInjectSalaryPanel(displayCurrencyCode: string): InjectionResu
   details.firstItemsTextPreview = items.slice(0, 4).map((li) => compactPreview(li.innerText ?? '', 140));
 
   if (!scope) {
-    const globalLi = findPresentLiGlobalScan(details);
-    if (globalLi) {
-      return injectPanel(globalLi, details, 'global-present-scan', displayCurrencyCode);
+    const looseLi = findLooseMostRecentRole(details);
+    if (looseLi) {
+      return injectPanel(looseLi, details, 'global-recent-scan', displayCurrencyCode);
     }
     return { success: false, reason: 'no_experience_section', details, panelEl: null };
   }
 
   if (items.length === 0) {
-    const globalLi = findPresentLiGlobalScan(details);
-    if (globalLi) {
-      return injectPanel(globalLi, details, 'global-present-scan', displayCurrencyCode);
+    const looseLi = findLooseMostRecentRole(details);
+    if (looseLi) {
+      return injectPanel(looseLi, details, 'global-recent-scan', displayCurrencyCode);
     }
     return { success: false, reason: 'no_list_items', details, panelEl: null };
   }
 
-  const presentMatch = findPresentInItems(items, details);
-  if (presentMatch) {
-    return injectPanel(presentMatch.li, details, presentMatch.mode, displayCurrencyCode);
-  }
-
-  const globalLi = findPresentLiGlobalScan(details);
-  if (globalLi) {
-    return injectPanel(globalLi, details, 'global-present-scan', displayCurrencyCode);
-  }
-
-  // Last resort: first Experience row so the extension is visibly working; copy explains uncertainty.
-  details.hint =
-    'No "Present" / "Présent" in Experience rows — attached placeholder to the first Experience entry.';
-  return injectPanel(items[0]!, details, 'first-row-fallback', displayCurrencyCode);
+  const companyRow = items[0]!;
+  const targetLi = resolveMostRecentPositionLi(companyRow);
+  details.mostRecentEmployerDomIndex = 0;
+  details.roleMount =
+    targetLi === companyRow ? 'single-role-or-unparsed-card' : 'first-nested-role-under-employer';
+  return injectPanel(targetLi, details, 'most-recent-role', displayCurrencyCode);
 }
 
 /**
@@ -128,9 +150,13 @@ export function findExperiencePanelMount(li: HTMLElement): HTMLElement {
 function injectPanel(
   li: HTMLElement,
   details: Record<string, unknown>,
-  mode: 'present-row' | 'global-present-scan' | 'first-row-fallback',
+  mode: 'most-recent-role' | 'global-recent-scan',
   displayCurrencyCode: string,
 ): InjectionResult {
+  if (!profileExperienceSectionContains(li)) {
+    details.rejectionReason = 'mount_outside_experience_module';
+    return { success: false, reason: 'no_experience_section', details, panelEl: null };
+  }
   const panel = createPanelElement(mode, displayCurrencyCode);
   const mount = findExperiencePanelMount(li);
   mount.appendChild(panel);
@@ -138,29 +164,6 @@ function injectPanel(
   details.matchStrategy = mode;
   details.matchedTextLen = (li.innerText ?? '').length;
   return { success: true, reason: 'injected', details, panelEl: panel };
-}
-
-function findPresentInItems(
-  items: HTMLElement[],
-  details: Record<string, unknown>,
-): { li: HTMLElement; mode: 'present-row' } | null {
-  let presentButShort = 0;
-  for (let i = 0; i < items.length; i++) {
-    const li = items[i]!;
-    const text = li.innerText ?? '';
-    if (!looksLikeCurrentRole(text)) {
-      continue;
-    }
-    if (text.length < 8) {
-      presentButShort++;
-      details.presentTooShortSampleLen ??= text.length;
-      continue;
-    }
-    details.matchedIndex = i;
-    return { li, mode: 'present-row' };
-  }
-  details.presentRowsTooShort = presentButShort;
-  return null;
 }
 
 function compactPreview(s: string, max: number): string {
@@ -201,10 +204,7 @@ function findExperienceScope(details: Record<string, unknown>): Element | null {
 
 /** When strict Experience block is missing (new layouts), search within main column. */
 function findExperienceScopeLoose(details: Record<string, unknown>): Element | null {
-  const main =
-    document.querySelector('main .scaffold-layout__main') ??
-    document.querySelector('main [role="main"]') ??
-    document.querySelector('main');
+  const main = queryLinkedInProfileMain(document);
 
   if (!main) {
     return null;
@@ -218,26 +218,68 @@ function findExperienceScopeLoose(details: Record<string, unknown>): Element | n
     }
   }
 
-  details.experienceScopeVia = 'loose:main';
-  return main;
+  /** Never scoped to bare `main` — avoids attaching to unrelated lists (Featured, suggestions, …). */
+  details.experienceScopeVia = 'loose:no-heading-section';
+  return null;
+}
+
+/** Distance from `scope` — shallow lists are the main Experience feed; nested role lists under one company are deeper. */
+function depthFromScope(el: Element, scope: Element): number {
+  let d = 0;
+  let x: Element | null = el;
+  while (x && x !== scope) {
+    d++;
+    x = x.parentElement;
+  }
+  return d;
+}
+
+/** `entity-collection-item` cards scoped to Experience; skips nodes nested inside another such card on the rare layouts that duplicate the key. */
+function listExperienceEntityCards(scope: Element): HTMLElement[] {
+  const hits = [...scope.querySelectorAll(EXPERIENCE_ENTITY_CARD_SEL)] as HTMLElement[];
+  return hits.filter((el) => {
+    const parent = el.parentElement;
+    const outer = parent?.closest(EXPERIENCE_ENTITY_CARD_SEL);
+    return outer == null;
+  });
+}
+
+/**
+ * Prefer dedicated Experience anchors (avoid `main`-wide scans where unrelated entity widgets also use `entity-collection-item`).
+ */
+function entityCollectionCardsEnabled(details: Record<string, unknown>): boolean {
+  const v = details.experienceScopeVia;
+  return v === '#experience' || v === 'heading:Experience' || v === 'loose:section+h2';
 }
 
 function listExperienceItems(scope: Element, details: Record<string, unknown>): HTMLElement[] {
-  const uls = [...scope.querySelectorAll('ul')];
-  let best: HTMLElement[] = [];
-  let bestScore = 0;
-  for (const ul of uls) {
+  if (entityCollectionCardsEnabled(details)) {
+    const cards = listExperienceEntityCards(scope);
+    if (cards.length > 0) {
+      details.listStrategy = `entity-collection-item (${cards.length} cards)`;
+      return cards;
+    }
+  }
+
+  type Cand = { top: HTMLElement[]; depth: number };
+  /** First `ul` in document order among those at minimal depth (`querySelectorAll` order). Older code maximized `li` count among ties, which picked nested multi-role lists in some React layouts. */
+  let best: Cand | null = null;
+  for (const ul of scope.querySelectorAll('ul')) {
     const top = [...ul.children].filter(
       (c): c is HTMLElement => c instanceof HTMLElement && c.tagName === 'LI',
     );
-    if (top.length > bestScore) {
-      bestScore = top.length;
-      best = top;
+    if (top.length === 0) {
+      continue;
+    }
+    const depth = depthFromScope(ul, scope);
+    if (best === null || depth < best.depth) {
+      best = { top, depth };
     }
   }
-  if (best.length > 0) {
-    details.listStrategy = `max-ul (${bestScore} top-level li)`;
-    return best;
+
+  if (best !== null) {
+    details.listStrategy = `shallowest-ul-first (depth ${best.depth}, ${best.top.length} li)`;
+    return best.top;
   }
 
   const fallback = [...scope.querySelectorAll('li.artdeco-list__item, li[class*="pvs-list"]')].filter(
@@ -247,32 +289,59 @@ function listExperienceItems(scope: Element, details: Record<string, unknown>): 
   return fallback;
 }
 
-/** Broad scan: first job-sized `li` under main whose text includes Present (handles odd nesting). */
-function findPresentLiGlobalScan(details: Record<string, unknown>): HTMLElement | null {
-  const root =
-    document.querySelector('main .scaffold-layout__main') ??
-    document.querySelector('main') ??
-    document.body;
-
-  const lis = root.querySelectorAll('li');
-  const candidates: HTMLElement[] = [];
-  for (const li of lis) {
-    if (!(li instanceof HTMLElement)) {
-      continue;
+/**
+ * First top-level company card = most recent employer (LinkedIn reverse-chronological order).
+ * If that card groups multiple roles in a nested list, the first nested row is the most recent role there.
+ */
+export function resolveMostRecentPositionLi(companyRowLi: HTMLElement): HTMLElement {
+  for (const ul of companyRowLi.querySelectorAll(':scope ul')) {
+    const lis = [...ul.children].filter(
+      (c): c is HTMLElement => c instanceof HTMLElement && c.tagName === 'LI',
+    );
+    if (lis.length >= 2) {
+      return lis[0]!;
     }
-    const t = li.innerText ?? '';
-    if (!looksLikeCurrentRole(t) || t.length < 8 || t.length > 8000) {
-      continue;
-    }
-    candidates.push(li);
   }
-
-  details.globalPresentCandidates = candidates.length;
-  return candidates[0] ?? null;
+  return companyRowLi;
 }
 
-function looksLikeCurrentRole(text: string): boolean {
-  return /\b(present|présent)\b/i.test(text);
+/**
+ * Walk from the injected panel anchor to the Experience row/card DOM node.
+ * React layouts anchor on `entity-collection-item` `div`s; classic markup uses `li`.
+ */
+export function resolveExperienceHostFromSalaryPanel(panelEl: HTMLElement): HTMLElement | null {
+  const entity = panelEl.closest(EXPERIENCE_ENTITY_CARD_SEL);
+  if (entity instanceof HTMLElement) {
+    return entity;
+  }
+  const li = panelEl.closest('li');
+  return li instanceof HTMLElement ? li : null;
+}
+
+/** Same list heuristic, scoped to the Experience subsection inside `main` so we do not pick another shallow list (e.g. recommendations). */
+function findLooseMostRecentRole(details: Record<string, unknown>): HTMLElement | null {
+  const main = queryLinkedInProfileMain(document);
+  if (!main) {
+    return null;
+  }
+  const expSec = [...main.querySelectorAll('section')].find((sec) => {
+    const hx = sec.querySelector('h2, h3');
+    return /\bexperience\b/i.test(hx?.textContent ?? '');
+  });
+  if (!expSec) {
+    return null;
+  }
+  const scope = expSec;
+
+  const subDetails: Record<string, unknown> = {};
+  subDetails.experienceScopeVia = 'loose:section+h2';
+  const items = listExperienceItems(scope, subDetails);
+  details.looseListStrategy = subDetails.listStrategy;
+  details.looseScopeVia = 'main>section:Experience';
+  if (items.length === 0) {
+    return null;
+  }
+  return resolveMostRecentPositionLi(items[0]!);
 }
 
 function escapeHtml(s: string): string {
@@ -283,22 +352,78 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function wireSalaryPanelExplainPopover(panel: HTMLElement, explainToggleIdAttr: string, explainBodyIdAttr: string): void {
+  const toggle = panel.querySelector(`#${CSS.escape(explainToggleIdAttr)}`);
+  const body = panel.querySelector(`#${CSS.escape(explainBodyIdAttr)}`);
+  if (!(toggle instanceof HTMLButtonElement) || !(body instanceof HTMLElement)) {
+    return;
+  }
+
+  const setOpen = (open: boolean): void => {
+    body.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    panel.classList.toggle('lse-panel--explain-open', open);
+  };
+
+  toggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(body.hidden);
+  });
+
+  explainPopoverDocListeners.get(panel)?.abort();
+  const ac = new AbortController();
+  explainPopoverDocListeners.set(panel, ac);
+  const docOpts = { capture: true, signal: ac.signal } as const;
+
+  document.addEventListener(
+    'click',
+    (e) => {
+      if (!panel.isConnected || !panel.classList.contains('lse-panel--explain-open')) {
+        return;
+      }
+      if (e.target instanceof Node && panel.contains(e.target)) {
+        return;
+      }
+      setOpen(false);
+    },
+    docOpts,
+  );
+
+  document.addEventListener(
+    'keydown',
+    (e: KeyboardEvent) => {
+      if (
+        !panel.isConnected ||
+        !panel.classList.contains('lse-panel--explain-open') ||
+        e.key !== 'Escape'
+      ) {
+        return;
+      }
+      setOpen(false);
+      toggle.focus();
+    },
+    docOpts,
+  );
+}
+
 function createPanelElement(
-  mode: 'present-row' | 'global-present-scan' | 'first-row-fallback',
+  mode: 'most-recent-role' | 'global-recent-scan',
   displayCurrencyCode: string,
 ): HTMLElement {
   const host = document.createElement('aside');
   host.setAttribute(LSE_PANEL_ATTR, '');
   host.className = 'lse-panel';
   host.setAttribute('aria-label', 'Estimated compensation (extension)');
+  const explainUid = `${Math.random().toString(36).slice(2, 11)}`;
+  const explainToggleIdAttr = `lse-explain-t-${explainUid}`;
+  const explainBodyIdAttr = `lse-explain-b-${explainUid}`;
   const ccy = escapeHtml(displayCurrencyCode);
 
   const note =
-    mode === 'first-row-fallback'
-      ? 'No “Present” date found — estimate may not match the top Experience row.'
-      : mode === 'global-present-scan'
-        ? 'Attached via page scan (Experience layout non-standard).'
-        : 'Fetching a public-market estimate…';
+    mode === 'global-recent-scan'
+      ? 'Attached via main-column scan (Experience layout non-standard).'
+      : 'Fetching a public-market estimate…';
 
   host.innerHTML = `
     <div class="lse-panel__header">Est. compensation <span class="lse-panel__ccy">(${ccy})</span></div>
@@ -314,10 +439,18 @@ function createPanelElement(
       <div class="lse-panel__busy-track" aria-hidden="true"><div class="lse-panel__busy-fill"></div></div>
     </div>
     <div class="lse-panel__row"><span class="lse-panel__label">Range</span><span class="lse-panel__value" data-lse-field="range">—</span></div>
-    <div class="lse-panel__row"><span class="lse-panel__label">TC (incl. bonus)</span><span class="lse-panel__value" data-lse-field="tc">—</span></div>
-    <p class="lse-panel__note" data-lse-field="note">${note}</p>
+    <div class="lse-panel__row"><span class="lse-panel__label">TC (base+bonus+stock)</span><span class="lse-panel__value" data-lse-field="tc">—</span></div>
+    <div class="lse-panel__explain">
+      <button type="button" class="lse-panel__explain-toggle" id="${explainToggleIdAttr}"
+        aria-expanded="false" aria-controls="${explainBodyIdAttr}">Why this estimate?</button>
+      <div class="lse-panel__explain-body" id="${explainBodyIdAttr}" hidden role="region"
+        aria-labelledby="${explainToggleIdAttr}">
+        <p class="lse-panel__note" data-lse-field="note">${escapeHtml(note)}</p>
+      </div>
+    </div>
   `;
 
+  wireSalaryPanelExplainPopover(host, explainToggleIdAttr, explainBodyIdAttr);
   return host;
 }
 
@@ -420,7 +553,7 @@ export function beginSalaryPanelBusy(panel: HTMLElement): () => void {
   };
 }
 
-/** Build LLM input from the Experience row `li` and the visible profile header (best-effort selectors). */
+/** Build LLM input from the Experience row `li`, top-card fields, and scraped profile sections. */
 export function collectSalaryEstimateContext(
   experienceLi: HTMLElement,
   displayCurrencyCode: string,
@@ -436,12 +569,20 @@ export function collectSalaryEstimateContext(
     document.querySelector('main .pv-text-details__left-panel .text-body-medium')?.textContent?.trim() ??
     null;
 
+  const sections = scrapeLinkedInProfileSections();
+
   return {
     profileName,
     headline,
     experienceRowText: (experienceLi.innerText ?? '').replace(/\s+/g, ' ').trim(),
     profileUrl: location.href,
     outputCurrency: normalizeCurrencyCode(displayCurrencyCode),
+    experienceSectionText: sections.experienceSectionText,
+    educationSectionText: sections.educationSectionText,
+    skillsSectionText: sections.skillsSectionText,
+    aboutText: sections.aboutText,
+    certificationsSectionText: sections.certificationsText,
+    locationLine: sections.locationLine,
   };
 }
 

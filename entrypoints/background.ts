@@ -43,12 +43,7 @@ export default defineBackground(() => {
           })
           .catch((err: unknown) => {
             console.error('[salary-estimator] getSettings / ensureDefaultSettings failed', err);
-            sendResponse({
-              currencyCode: 'USD',
-              currencyIsUserChoice: false,
-              geoCurrencyCode: null,
-              geoLookupAt: null,
-            });
+            sendResponse({ currencyCode: 'USD' });
           });
         return true;
       }
@@ -60,11 +55,8 @@ export default defineBackground(() => {
           .catch((err: unknown) => {
             console.error('[salary-estimator] getLlmSettings failed', err);
             sendResponse({
-              providerId: 'gemini',
               geminiModel: 'gemini-2.5-flash',
-              openaiModel: 'gpt-4o-mini',
               geminiKeyConfigured: false,
-              openaiKeyConfigured: false,
             });
           });
         return true;

@@ -27,9 +27,7 @@ vi.mock('@/lib/browser', () => ({
 }));
 
 import {
-  applyGeoCurrency,
   ensureDefaultSettings,
-  GEO_LOOKUP_CACHE_MS,
   readLseSettings,
   setUserCurrency,
 } from '@/lib/lse-settings';
@@ -44,31 +42,23 @@ function clearStores() {
 }
 
 describe('ensureDefaultSettings', () => {
-  beforeEach(() => {
-    clearStores();
-    vi.restoreAllMocks();
-    /** Avoid real network when ensure re-tries geo (session retry path). */
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('tests: default fetch disabled')));
-  });
+  beforeEach(() => clearStores());
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  afterEach(() => vi.unstubAllGlobals());
 
-  it('writes provisional USD to local storage immediately', async () => {
+  it('writes USD when nothing stored', async () => {
     const s = await ensureDefaultSettings();
     expect(s.currencyCode).toBe('USD');
-    expect(s.currencyIsUserChoice).toBe(false);
-    expect(localStore[LSE_SETTINGS_KEY]).toBeDefined();
+    expect((localStore[LSE_SETTINGS_KEY] as { currencyCode: string }).currencyCode).toBe('USD');
   });
 
-  it('returns existing settings without overwriting', async () => {
-    await ensureDefaultSettings();
-    const again = await ensureDefaultSettings();
-    expect(again.currencyCode).toBe('USD');
+  it('returns stored currency without overwriting', async () => {
+    localStore[LSE_SETTINGS_KEY] = { currencyCode: 'EUR' };
+    const s = await ensureDefaultSettings();
+    expect(s.currencyCode).toBe('EUR');
   });
 
-  it('migrates legacy sync settings into local when local is empty', async () => {
+  it('migrates legacy sync blob into local and reads currencyCode', async () => {
     syncStore[LSE_SETTINGS_KEY] = {
       currencyCode: 'CAD',
       currencyIsUserChoice: true,
@@ -79,115 +69,21 @@ describe('ensureDefaultSettings', () => {
     expect(s?.currencyCode).toBe('CAD');
     expect(localStore[LSE_SETTINGS_KEY]).toEqual(syncStore[LSE_SETTINGS_KEY]);
   });
-
-  it('upgrades provisional defaults when fetch returns currency', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ currency: 'jpy' }),
-      }),
-    );
-
-    await ensureDefaultSettings();
-
-    await vi.waitFor(
-      async () => {
-        const cur = await readLseSettings();
-        expect(cur?.currencyCode).toBe('JPY');
-      },
-      { timeout: 3000 },
-    );
-  });
-
-  it('does not upgrade when user already chose a currency', async () => {
-    localStore[LSE_SETTINGS_KEY] = {
-      currencyCode: 'CHF',
-      currencyIsUserChoice: true,
-      geoCurrencyCode: null,
-      geoLookupAt: null,
-    };
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ currency: 'usd' }),
-      }),
-    );
-
-    await ensureDefaultSettings();
-
-    await new Promise((r) => setTimeout(r, 50));
-    const cur = await readLseSettings();
-    expect(cur?.currencyCode).toBe('CHF');
-  });
 });
 
 describe('setUserCurrency', () => {
-  beforeEach(() => {
-    clearStores();
-  });
+  beforeEach(() => clearStores());
 
-  it('marks user choice and preserves geo metadata when present', async () => {
+  it('stores normalized code and persists only currency field shape', async () => {
     localStore[LSE_SETTINGS_KEY] = {
       currencyCode: 'USD',
       currencyIsUserChoice: false,
       geoCurrencyCode: 'EUR',
       geoLookupAt: 1,
     };
-    await setUserCurrency('GBP');
+    await setUserCurrency('gbp');
     const s = await readLseSettings();
     expect(s?.currencyCode).toBe('GBP');
-    expect(s?.currencyIsUserChoice).toBe(true);
-    expect(s?.geoCurrencyCode).toBe('EUR');
-  });
-});
-
-describe('applyGeoCurrency', () => {
-  beforeEach(() => {
-    clearStores();
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('uses cache and skips fetch when lookup is fresh', async () => {
-    const t = Date.now();
-    localStore[LSE_SETTINGS_KEY] = {
-      currencyCode: 'EUR',
-      currencyIsUserChoice: false,
-      geoCurrencyCode: 'EUR',
-      geoLookupAt: t,
-    };
-
-    const fetchSpy = vi.fn();
-    vi.stubGlobal('fetch', fetchSpy);
-
-    await applyGeoCurrency();
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it('calls fetch when cache is stale', async () => {
-    localStore[LSE_SETTINGS_KEY] = {
-      currencyCode: 'EUR',
-      currencyIsUserChoice: false,
-      geoCurrencyCode: 'EUR',
-      geoLookupAt: Date.now() - GEO_LOOKUP_CACHE_MS - 60_000,
-    };
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ currency: 'sek' }),
-      }),
-    );
-
-    const s = await applyGeoCurrency();
-    expect(s.currencyCode).toBe('SEK');
+    expect(localStore[LSE_SETTINGS_KEY]).toEqual({ currencyCode: 'GBP' });
   });
 });

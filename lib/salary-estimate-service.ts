@@ -6,9 +6,8 @@ import { parseSalaryEstimateFromModelText } from '@/lib/salary-parse';
 import type { SalaryEstimateInput, SalaryEstimateWorkerResult } from '@/lib/salary-estimate-types';
 
 /**
- * Runs the salary estimate prompt against the configured LLM (service worker / Node tests).
- * Gemini: tries JSON + Google Search first, then JSON without search, then plain text.
- * OpenAI: JSON mode when supported, else plain.
+ * Runs the salary estimate prompt against Google Gemini (service worker / Node tests).
+ * Tries JSON + Google Search first, then JSON without search, then plain text.
  */
 export async function runSalaryEstimate(input: SalaryEstimateInput): Promise<SalaryEstimateWorkerResult> {
   const rid = input.requestId ?? '(no-request-id)';
@@ -17,13 +16,8 @@ export async function runSalaryEstimate(input: SalaryEstimateInput): Promise<Sal
 
   logLlmFlow('worker:estimate_run_start', {
     requestId: rid,
-    providerId: settings.providerId,
-    model:
-      settings.providerId === 'gemini'
-        ? settings.geminiModel
-        : settings.providerId === 'openai'
-          ? settings.openaiModel
-          : 'unknown',
+    provider: 'gemini',
+    model: settings.geminiModel,
     outputCurrency: input.outputCurrency,
     experiencePreview: input.experienceRowText.slice(0, 120),
   });

@@ -9,7 +9,7 @@ When you view a profile (including your own), the extension should:
 - **Estimate salary from public sources** — combine or infer a reasonable range from salary data that appears elsewhere on the web (job boards, surveys, company pages, etc.), not from anything private inside LinkedIn.
 - **Show a compact summary next to “current position”** — a small UI box beside the listed role with:
   - **Estimated low–high salary range**
-  - **Total compensation (TC)**, including bonuses where applicable
+  - **Total compensation (TC)** — modeled as cash base plus typical bonus plus annualized recurring stock/equity where public benchmarks support it
 
 The intent is to give a quick, at-a-glance sense of market compensation for the role as shown on the profile, with clear labeling that figures are **estimates** derived from external data.
 
@@ -17,7 +17,7 @@ The intent is to give a quick, at-a-glance sense of market compensation for the 
 
 - **Profile Experience panel** — On `/in/…` profile pages, the content script finds Experience (including newer layouts), prefers a row whose dates include **Present** / **Présent**, then falls back to a **global scan** of the main column, then (if needed) the **first Experience row** so a placeholder panel still appears. See `matchStrategy` / `inject summary` in console (`lib/linkedin-panel.ts`, styles in `assets/linkedin-panel.css`). Values are placeholders until public salary sources are integrated.
 
-- **LLM layer (provider-agnostic)** — In the toolbar popup, choose **Google Gemini** or **OpenAI**, paste an API key (stored only in **`chrome.storage.local`**), optional model id, then **Save** / **Test LLM connection**. The service worker runs completions via `lib/llm/route-completion.ts` (Gemini: Generative Language API; OpenAI: Chat Completions). Wire profile salary prompts to `completeWithStoredSettings()` / `routeLlmCompletion()` next.
+- **LLM layer (Google Gemini)** — In the toolbar popup, paste a **Gemini** API key from [Google AI Studio](https://aistudio.google.com/apikey) (stored only in **`chrome.storage.local`**), set an optional model id, then **Save** / **Test LLM connection**. The service worker runs completions via `lib/llm/route-completion.ts` (Generative Language API). Wire profile salary prompts to `completeWithStoredSettings()` / `routeLlmCompletion()` next.
 
 ## Status
 
@@ -42,7 +42,9 @@ Stack: **WXT** (Vite + Manifest V3), **TypeScript**, and **webextension-polyfill
 
 Settings are stored in **`chrome.storage.local`** (works without Chrome Sync). Legacy entries in `storage.sync` are migrated once when local is empty.
 
-LLM API keys never sync to the cloud with this storage mode; get a **Gemini** key from [Google AI Studio](https://aistudio.google.com/apikey) or an **OpenAI** key from your OpenAI account. Host permissions include `generativelanguage.googleapis.com` and `api.openai.com`.
+LLM API keys never sync to the cloud with this storage mode. Host permission: **`https://generativelanguage.googleapis.com/*`** for the Gemini API.
+
+If the API returns *“You exceeded your current quota”* or similar, check [Gemini usage and rate limits](https://ai.google.dev/gemini-api/docs/rate-limits), billing/credits on your Google AI project, or try another model id (e.g. `gemini-2.5-flash`).
 
 Load the built folder as an unpacked / temporary extension:
 
@@ -53,7 +55,7 @@ Load the built folder as an unpacked / temporary extension:
 **Debugging on LinkedIn:** After `npm run build`, reload the extension on `chrome://extensions`, then hard-refresh the profile.
 
 - **Page console** (F12 on the **LinkedIn tab**, not the extension popup): filter **`salary-estimator`**. You should see **`[salary-estimator] ready`**, **`currency label`**, and **`[salary-estimator] inject`**. If you see nothing, the content script is not running (wrong tab, extension disabled, or filter hiding messages).
-- **Service worker** (geo / storage): `chrome://extensions` → **Salary Estimator** → **Service worker** → *Inspect views*. Geo lookups log as **`[salary-estimator] geo`** and **`[salary-estimator] settings`**.
+- **Service worker** (LLM / settings): `chrome://extensions` → **Salary Estimator** → **Service worker** → *Inspect views*.
 
 For full detail, filter `[salary-estimator:debug]`. Silence verbose lines: `sessionStorage.setItem('lse-debug', '0')` in the page console; turn back on with `'1'`.
 

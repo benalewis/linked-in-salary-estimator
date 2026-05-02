@@ -1,0 +1,66 @@
+# Production Chrome MV3 zip for Chrome Web Store upload.
+# - Optional semver bump (package.json → WXT manifest version)
+# - `npm run zip` = `wxt zip` (build + zip with manifest at zip root)
+
+name: Chrome store bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Semver bump for package.json / extension manifest before packaging'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - none
+        default: patch
+      push_version_bump:
+        description: 'If a bump was applied, commit and push package.json + lockfile to this branch'
+        type: boolean
+        default: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    # `write` allows optional commit+push of the version bump; artifact upload does not require it.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bump version
+        if: inputs.version_bump != 'none'
+        run: npm version "${{ inputs.version_bump }}" --no-git-tag-version
+
+      - name: Record extension version
+        id: ver
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build Chrome zip (wxt zip)
+        run: npm run zip
+
+      - name: Upload Chrome Web Store zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: linked-in-salary-estimator-chrome-${{ steps.ver.outputs.version }}
+          path: .output/linked-in-salary-estimator-${{ steps.ver.outputs.version }}-chrome.zip
+          if-no-files-found: error
+
+      - name: Commit and push version bump
+        if: inputs.version_bump != 'none' && inputs.push_version_bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore(release): v$(node -p "require('./package.json').version")"
+          git push
