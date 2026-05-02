@@ -17,6 +17,8 @@ The intent is to give a quick, at-a-glance sense of market compensation for the 
 
 - **Profile Experience panel** — On `/in/…` profile pages, the content script finds Experience (including newer layouts), prefers a row whose dates include **Present** / **Présent**, then falls back to a **global scan** of the main column, then (if needed) the **first Experience row** so a placeholder panel still appears. See `matchStrategy` / `inject summary` in console (`lib/linkedin-panel.ts`, styles in `assets/linkedin-panel.css`). Values are placeholders until public salary sources are integrated.
 
+- **LLM layer (provider-agnostic)** — In the toolbar popup, choose **Google Gemini** or **OpenAI**, paste an API key (stored only in **`chrome.storage.local`**), optional model id, then **Save** / **Test LLM connection**. The service worker runs completions via `lib/llm/route-completion.ts` (Gemini: Generative Language API; OpenAI: Chat Completions). Wire profile salary prompts to `completeWithStoredSettings()` / `routeLlmCompletion()` next.
+
 ## Status
 
 Early-stage — salary **data sources** and ranges are not wired up; UI shell is in place on profiles with a current role.
@@ -39,6 +41,8 @@ Stack: **WXT** (Vite + Manifest V3), **TypeScript**, and **webextension-polyfill
 | `npm run compile` | Typecheck only (`tsc --noEmit`). |
 
 Settings are stored in **`chrome.storage.local`** (works without Chrome Sync). Legacy entries in `storage.sync` are migrated once when local is empty.
+
+LLM API keys never sync to the cloud with this storage mode; get a **Gemini** key from [Google AI Studio](https://aistudio.google.com/apikey) or an **OpenAI** key from your OpenAI account. Host permissions include `generativelanguage.googleapis.com` and `api.openai.com`.
 
 Load the built folder as an unpacked / temporary extension:
 

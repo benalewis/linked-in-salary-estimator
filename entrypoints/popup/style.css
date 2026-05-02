@@ -7,7 +7,8 @@
 
 body {
   margin: 0;
-  min-width: 280px;
+  min-width: 340px;
+  max-width: 420px;
 }
 
 .popup {
@@ -18,6 +19,59 @@ body {
   margin: 0 0 8px;
   font-size: 16px;
   font-weight: 600;
+}
+
+.popup__subtitle {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.popup__section {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.popup__section:last-of-type {
+  border-bottom: none;
+}
+
+.popup__text--small {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #424245;
+}
+
+.popup__link {
+  color: #0066cc;
+  text-decoration: none;
+}
+
+.popup__link:hover {
+  text-decoration: underline;
+}
+
+.popup__input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  color: #1d1d1f;
+}
+
+.popup__llm-block {
+  margin-top: 8px;
+}
+
+.popup__btn--secondary {
+  margin-top: 8px;
 }
 
 .popup__text {

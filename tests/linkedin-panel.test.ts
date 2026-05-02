@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isProfilePath, LSE_PANEL_ATTR, removeSalaryPanel, tryInjectSalaryPanel } from '@/lib/linkedin-panel';
+import {
+  findExperiencePanelMount,
+  isProfilePath,
+  LSE_PANEL_ATTR,
+  removeSalaryPanel,
+  tryInjectSalaryPanel,
+} from '@/lib/linkedin-panel';
 
 function stubLocation(pathname: string) {
   const href = `https://www.linkedin.com${pathname}`;
@@ -28,6 +34,30 @@ describe('isProfilePath', () => {
   });
 });
 
+describe('findExperiencePanelMount', () => {
+  it('prefers LinkedIn-style inner text column when present', () => {
+    document.body.innerHTML = `
+      <li class="top">
+        <div class="display-flex">
+          <div class="ivm">logo</div>
+          <div class="flex-column flex-grow-1">
+            <span>Role · Present · Company</span>
+          </div>
+        </div>
+      </li>`;
+    const li = document.querySelector('li.top')!;
+    const mount = findExperiencePanelMount(li);
+    expect(mount.className).toContain('flex-column');
+    expect(mount.className).toContain('flex-grow-1');
+  });
+
+  it('falls back to the experience li when no inner column', () => {
+    document.body.innerHTML = `<li class="plain">Past · 2020 – 2021</li>`;
+    const li = document.querySelector('li.plain')!;
+    expect(findExperiencePanelMount(li)).toBe(li);
+  });
+});
+
 describe('tryInjectSalaryPanel', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -44,6 +74,7 @@ describe('tryInjectSalaryPanel', () => {
     const r = tryInjectSalaryPanel('USD');
     expect(r.success).toBe(false);
     expect(r.reason).toBe('not_profile_path');
+    expect(r.panelEl).toBeNull();
   });
 
   it('injects beside Present role when Experience section is standard', () => {
@@ -61,6 +92,7 @@ describe('tryInjectSalaryPanel', () => {
     expect(r.success).toBe(true);
     expect(r.reason).toBe('injected');
     expect(r.details.matchStrategy).toBe('present-row');
+    expect(r.panelEl).toBeTruthy();
 
     const panel = document.querySelector(`[${LSE_PANEL_ATTR}]`);
     expect(panel).toBeTruthy();

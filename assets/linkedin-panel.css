@@ -1,10 +1,18 @@
 /* Scoped styles for injected salary panel (LinkedIn page is third-party). */
 .lse-panel {
   box-sizing: border-box;
+  display: block;
   position: relative;
-  z-index: 100;
-  margin-top: 10px;
-  max-width: min(360px, 100%);
+  /* Stay within the text column; avoid painting over the adjacent LinkedIn layout column */
+  z-index: 1;
+  width: 100%;
+  max-width: min(400px, 100%);
+  margin-top: 12px;
+  margin-left: 0;
+  margin-right: auto;
+  align-self: stretch;
+  flex: 1 1 100%;
+  min-height: 0;
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid rgba(0, 0, 0, 0.12);
@@ -53,6 +61,102 @@
   color: rgba(0, 0, 0, 0.45);
 }
 
+.lse-panel--busy {
+  border-color: rgba(37, 99, 235, 0.28);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.08);
+}
+
+.lse-panel--busy .lse-panel__note {
+  display: none;
+}
+
+.lse-panel__busy {
+  margin: 0 0 10px;
+  padding: 10px 10px 8px;
+  border-radius: 6px;
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+}
+
+.lse-panel__busy-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.lse-panel__spinner {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 2px solid rgba(37, 99, 235, 0.2);
+  border-top-color: rgba(37, 99, 235, 0.95);
+  border-radius: 50%;
+  animation: lse-spin 0.75s linear infinite;
+}
+
+.lse-panel__busy-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.lse-panel__busy-headline {
+  font-weight: 600;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+  letter-spacing: 0.01em;
+}
+
+.lse-panel__busy-detail {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.lse-panel__busy-meta {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(0, 0, 0, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+
+.lse-panel__busy-track {
+  margin-top: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.07);
+  overflow: hidden;
+}
+
+.lse-panel__busy-fill {
+  width: 38%;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.75), rgba(37, 99, 235, 0.1));
+  animation: lse-shimmer 1.25s ease-in-out infinite;
+}
+
+.lse-panel--loading .lse-panel__value {
+  opacity: 0.65;
+}
+
+@keyframes lse-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes lse-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .lse-panel {
     background: #1b1f23;
@@ -78,5 +182,36 @@
 
   .lse-panel__note {
     color: rgba(255, 255, 255, 0.45);
+  }
+
+  .lse-panel--busy {
+    border-color: rgba(96, 165, 250, 0.35);
+    box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.1);
+  }
+
+  .lse-panel__busy {
+    background: rgba(96, 165, 250, 0.1);
+    border-color: rgba(96, 165, 250, 0.2);
+  }
+
+  .lse-panel__spinner {
+    border-color: rgba(255, 255, 255, 0.2);
+    border-top-color: rgba(147, 197, 253, 0.95);
+  }
+
+  .lse-panel__busy-headline {
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .lse-panel__busy-detail {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .lse-panel__busy-meta {
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  .lse-panel__busy-track {
+    background: rgba(255, 255, 255, 0.1);
   }
 }

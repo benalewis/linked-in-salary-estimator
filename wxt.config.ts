@@ -7,7 +7,12 @@ export default defineConfig({
     description:
       'Shows estimated salary range and total compensation next to the current role on LinkedIn profiles.',
     permissions: ['storage'],
-    host_permissions: ['https://ipapi.co/*', 'https://ipwho.is/*'],
+    host_permissions: [
+      'https://ipapi.co/*',
+      'https://ipwho.is/*',
+      'https://generativelanguage.googleapis.com/*',
+      'https://api.openai.com/*',
+    ],
   }),
   // Firefox policy warning (data collection) — review before AMO submit:
   // https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/
