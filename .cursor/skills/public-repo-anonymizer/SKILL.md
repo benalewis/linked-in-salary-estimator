@@ -1,10 +1,11 @@
 ---
 name: public-repo-anonymizer
 description: >-
-  Scans this repository before open-sourcing: secrets, credentials, accidental PII, local paths,
-  and store-only artifacts. Guides redaction or safe placeholders without weakening security
-  guidance in code comments. Use when making the repo public, before a Chrome Web Store/GitHub Pages
-  release, or whenever the user asks to anonymize, scrub secrets, or verify nothing sensitive ships.
+  Scans this repository before open-sourcing: secrets, credentials, accidental PII, personal names,
+  local paths, and store-only artifacts. Replace real names with generic placeholders (e.g. John Doe).
+  Guides redaction or safe placeholders without weakening security guidance in code comments. Use when
+  making the repo public, before a Chrome Web Store/GitHub Pages release, or whenever the user asks to
+  anonymize, scrub secrets, or verify nothing sensitive ships.
 disable-model-invocation: true
 ---
 
@@ -16,7 +17,11 @@ Explicitly **`@public-repo-anonymizer`**, or any request to scrub / verify befor
 
 ## Mandatory outcome
 
-Produce a short **risk list** (file + finding), then apply **minimal fixes** the user agrees to (placeholder URLs, `.gitignore`, moving samples). **Never paste real recovered secrets** into chat—rotate them if leaked.
+Produce a short **risk list** (file + finding), then apply **minimal fixes** the user agrees to (placeholder URLs, `.gitignore`, moving samples).
+
+- **Personal names:** Any identifiable real **person names** (authors, testers, fictitious-but-real acquaintances in examples, people in screenshots) must be anonymized unless the repo is explicitly meant to **credit** someone. Prefer stable fictitious placeholders: **`John Doe`**, **`Jane Doe`**, or **`Alex Example`** — not initials that still map to someone. Applies to **`LICENSE`** copyright holders, **`CODEOWNERS`**, **`README`**, **`docs/`**, **`description.txt`**, commit-message examples, and **test/fixture HTML** (e.g. LinkedIn-ish cards). Maintain **consistent** placeholders within a narrative so snippets stay readable.
+
+**Never paste real recovered secrets** into chat—rotate them if leaked.
 
 ---
 
@@ -42,8 +47,9 @@ Also:
 |------|--------|
 | **Secrets** | No real API keys, OAuth client secrets, refresh tokens, or Chrome Web Store tokens in committed files. CI must use `${{ secrets.* }}` only. |
 | **Paths** | Replace machine-specific paths (`C:\Users\...`, `V:\...`) in docs or scripts with neutral examples. |
-| **Privacy / contact** | Public `docs/privacy-policy.html` and `description.txt` may name a **GitHub org/user** on purpose for support—confirm that is intended. |
-| **Images** | `image.png`, screenshots, or store assets: no real DMs, emails, or profile data unless intentional. |
+| **Privacy / contact** | Public `docs/privacy-policy.html` and `description.txt`: support links often use GitHub **`OWNER/repo`** — for a fully anonymous fork, swap to placeholders or omit; otherwise confirm intent to ship real handles. |
+| **Personal names** | No real identifying names outside intentional attribution policy; anonymize examples and fixtures (**`John Doe`**, **`Jane Doe`**, etc.). |
+| **Images** | `image.png`, screenshots, or store assets: no real DMs, emails, faces, or profile data unless intentional. |
 | **Tests** | Fake keys like `test-key` / `secret-g` are fine; no production-like 40-char Google keys. |
 | **dependabot / workflows** | No hardcoded registry tokens; `npm whoami` output must not be in repo. |
 
