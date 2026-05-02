@@ -7,11 +7,17 @@ describe('mergeLlmPatch', () => {
     const cur: LlmStoredSettings = {
       ...DEFAULT_LLM_SETTINGS,
       geminiApiKey: 'secret-g',
-      geminiModel: 'gemini-2.5-flash',
+      geminiModel: 'gemini-2.5-flash-lite',
     };
     const next = mergeLlmPatch(cur, { geminiModel: 'gemini-2.5-pro' });
     expect(next.geminiApiKey).toBe('secret-g');
     expect(next.geminiModel).toBe('gemini-2.5-pro');
+  });
+
+  it('updates geminiEnabled when patch includes boolean', () => {
+    const cur: LlmStoredSettings = { ...DEFAULT_LLM_SETTINGS, geminiEnabled: true };
+    expect(mergeLlmPatch(cur, { geminiEnabled: false }).geminiEnabled).toBe(false);
+    expect(mergeLlmPatch(cur, {}).geminiEnabled).toBe(true);
   });
 
   it('replaces a key when patch has a new non-empty value', () => {

@@ -86,6 +86,33 @@ body {
   color: #636366;
 }
 
+.popup__toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.popup__toggle-input {
+  margin-top: 2px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: #0066cc;
+  cursor: pointer;
+}
+
+.popup__toggle-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d1d1f;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
 .popup__label {
   display: block;
   margin-bottom: 6px;

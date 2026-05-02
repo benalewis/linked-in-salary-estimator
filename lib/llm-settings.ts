@@ -23,7 +23,10 @@ function normalizeStored(raw: unknown): LlmStoredSettings {
     typeof o.geminiModel === 'string' && o.geminiModel.trim().length > 0
       ? o.geminiModel.trim()
       : DEFAULT_LLM_SETTINGS.geminiModel;
+  const geminiEnabled =
+    typeof o.geminiEnabled === 'boolean' ? o.geminiEnabled : DEFAULT_LLM_SETTINGS.geminiEnabled;
   return {
+    geminiEnabled,
     geminiApiKey: typeof o.geminiApiKey === 'string' ? o.geminiApiKey : '',
     geminiModel: upgradeDeprecatedGeminiModel(geminiModelRaw),
   };
@@ -51,6 +54,7 @@ export async function writeLlmSettingsFull(s: LlmStoredSettings): Promise<void> 
 
 export function toLlmSettingsView(s: LlmStoredSettings): LlmSettingsView {
   return {
+    geminiEnabled: s.geminiEnabled,
     geminiModel: s.geminiModel,
     geminiKeyConfigured: Boolean(s.geminiApiKey.trim()),
   };
