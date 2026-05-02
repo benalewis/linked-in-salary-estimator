@@ -1,7 +1,7 @@
 import './style.css';
 import browser from '@/lib/browser';
 import { CURRENCY_OPTIONS, isOfferedCurrency } from '@/lib/currencies';
-import { setUserCurrency, type LseSettings } from '@/lib/lse-settings';
+import { setEstimateRunMode, setUserCurrency, type EstimateRunMode, type LseSettings } from '@/lib/lse-settings';
 import {
   mergeLlmSettings,
   readLlmSettingsFull,
@@ -60,6 +60,21 @@ function mount(currency: LseSettings, llm: LlmSettingsView): void {
         <p class="popup__hint" id="lse-hint"></p>
       </section>
 
+      <section class="popup__section" aria-labelledby="lse-run-heading">
+        <h2 class="popup__subtitle" id="lse-run-heading">When to estimate</h2>
+        <p class="popup__text popup__text--small">Applies on every LinkedIn profile you open.</p>
+        <div class="popup__radio-stack" role="radiogroup" aria-labelledby="lse-run-heading">
+          <label class="popup__radio-row">
+            <input type="radio" name="lse-estimate-run" value="manual" id="lse-run-manual" class="popup__radio" />
+            <span><strong class="popup__radio-title">Manual (default)</strong> — Panel shows “Run”; no request until you click it.</span>
+          </label>
+          <label class="popup__radio-row">
+            <input type="radio" name="lse-estimate-run" value="auto" id="lse-run-auto" class="popup__radio" />
+            <span><strong class="popup__radio-title">Auto</strong> — Start the estimate as soon as the panel appears (cached results still apply).</span>
+          </label>
+        </div>
+      </section>
+
       <section class="popup__section" aria-labelledby="lse-llm-heading">
         <h2 class="popup__subtitle" id="lse-llm-heading">Google Gemini</h2>
         <p class="popup__text popup__text--small">
@@ -103,6 +118,37 @@ function mount(currency: LseSettings, llm: LlmSettingsView): void {
     Object.assign(currency, next);
     sel.innerHTML = buildSelectOptions(next.currencyCode);
     hint.textContent = currencyHint();
+  });
+
+  const runManual = app.querySelector('#lse-run-manual') as HTMLInputElement;
+  const runAuto = app.querySelector('#lse-run-auto') as HTMLInputElement;
+  const syncRunModeUi = (mode: EstimateRunMode): void => {
+    runManual.checked = mode === 'manual';
+    runAuto.checked = mode === 'auto';
+  };
+  syncRunModeUi(currency.estimateRunMode);
+
+  async function persistRunModeFromUi(): Promise<void> {
+    const mode: EstimateRunMode = runAuto.checked ? 'auto' : 'manual';
+    if (mode === currency.estimateRunMode) {
+      syncRunModeUi(currency.estimateRunMode);
+      return;
+    }
+    await setEstimateRunMode(mode);
+    const next = await loadCurrencySettings();
+    Object.assign(currency, next);
+    syncRunModeUi(next.estimateRunMode);
+  }
+
+  runManual.addEventListener('change', () => {
+    if (runManual.checked) {
+      void persistRunModeFromUi();
+    }
+  });
+  runAuto.addEventListener('change', () => {
+    if (runAuto.checked) {
+      void persistRunModeFromUi();
+    }
   });
 
   const geminiEnabled = app.querySelector('#lse-gemini-enabled') as HTMLInputElement;

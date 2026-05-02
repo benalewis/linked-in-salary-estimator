@@ -40,6 +40,43 @@
   opacity: 0.82;
 }
 
+.lse-panel__manual {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.lse-panel__manual-text {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.62);
+}
+
+.lse-panel__run {
+  margin: 0;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid rgba(29, 78, 216, 0.9);
+  background: rgba(37, 99, 235, 0.96);
+}
+
+.lse-panel__run:hover {
+  background: rgba(29, 78, 216, 1);
+}
+
+.lse-panel__run:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.45);
+  outline-offset: 2px;
+}
+
 .lse-panel__row {
   display: flex;
   justify-content: space-between;
@@ -232,6 +269,15 @@
 
   .lse-panel__ccy {
     opacity: 0.8;
+  }
+
+  .lse-panel__manual {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .lse-panel__manual-text {
+    color: rgba(255, 255, 255, 0.62);
   }
 
   .lse-panel__label {

@@ -3,9 +3,13 @@ import { normalizeCurrencyCode } from '@/lib/currencies';
 
 export const LSE_SETTINGS_KEY = 'lseSettings' as const;
 
-/** Display currency for the panel and estimates — user-chosen, persisted in storage.local. */
+/** `'manual'`: panel shows Run; `'auto'`: estimate starts after inject (respects Gemini enable/key). */
+export type EstimateRunMode = 'manual' | 'auto';
+
+/** Display currency and estimate trigger behaviour — persisted in storage.local. */
 export type LseSettings = {
   currencyCode: string;
+  estimateRunMode: EstimateRunMode;
 };
 
 /**
@@ -13,6 +17,18 @@ export type LseSettings = {
  * One-time migration: if local is empty but legacy `storage.sync` has settings, copy to local.
  * Legacy objects may include geo fields; only `currencyCode` is read.
  */
+function normalizeEstimateRunMode(v: unknown): EstimateRunMode {
+  return v === 'auto' ? 'auto' : 'manual';
+}
+
+export function normalizeLseSettingsRow(o: Record<string, unknown>): LseSettings {
+  return {
+    currencyCode:
+      typeof o.currencyCode === 'string' ? normalizeCurrencyCode(o.currencyCode) : 'USD',
+    estimateRunMode: normalizeEstimateRunMode(o.estimateRunMode),
+  };
+}
+
 async function readRawSettings(): Promise<unknown> {
   const localBag = await browser.storage.local.get(LSE_SETTINGS_KEY);
   let raw = localBag[LSE_SETTINGS_KEY];
@@ -33,31 +49,40 @@ export async function readLseSettings(): Promise<LseSettings | null> {
   if (!v || typeof v !== 'object') {
     return null;
   }
-  const o = v as { currencyCode?: unknown };
+  const o = v as Record<string, unknown>;
   if (typeof o.currencyCode !== 'string') {
     return null;
   }
-  return { currencyCode: normalizeCurrencyCode(o.currencyCode) };
+  return normalizeLseSettingsRow(o);
 }
 
 export async function writeLseSettings(s: LseSettings): Promise<void> {
   await browser.storage.local.set({
-    [LSE_SETTINGS_KEY]: { currencyCode: normalizeCurrencyCode(s.currencyCode) },
+    [LSE_SETTINGS_KEY]: {
+      currencyCode: normalizeCurrencyCode(s.currencyCode),
+      estimateRunMode: s.estimateRunMode === 'auto' ? 'auto' : 'manual',
+    },
   });
 }
 
-/** If nothing stored yet, save USD. Otherwise return existing (last user choice or migrated record). */
+/** If nothing stored yet, save USD + manual mode. Otherwise return existing (last user choice or migrated record). */
 export async function ensureDefaultSettings(): Promise<LseSettings> {
   const existing = await readLseSettings();
   if (existing) {
     return existing;
   }
 
-  const provisional: LseSettings = { currencyCode: 'USD' };
+  const provisional: LseSettings = { currencyCode: 'USD', estimateRunMode: 'manual' };
   await writeLseSettings(provisional);
   return provisional;
 }
 
 export async function setUserCurrency(code: string): Promise<void> {
-  await writeLseSettings({ currencyCode: normalizeCurrencyCode(code) });
+  const cur = await ensureDefaultSettings();
+  await writeLseSettings({ ...cur, currencyCode: normalizeCurrencyCode(code) });
+}
+
+export async function setEstimateRunMode(mode: EstimateRunMode): Promise<void> {
+  const cur = await ensureDefaultSettings();
+  await writeLseSettings({ ...cur, estimateRunMode: mode });
 }

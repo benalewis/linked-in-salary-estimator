@@ -23,6 +23,10 @@ web-ext.config.ts
 .env.*
 !.env.example
 
+# Local secrets / keystores (never commit)
+*.pem
+*.p12
+
 # Test / coverage
 coverage
 .nyc_output

@@ -3,6 +3,7 @@
 import { formatMoney, normalizeCurrencyCode } from '@/lib/currencies';
 import { queryLinkedInProfileMain } from '@/lib/linkedin-main-root';
 import { scrapeLinkedInProfileSections } from '@/lib/linkedin-profile-scrape';
+import type { EstimateRunMode } from '@/lib/lse-settings';
 import type { SalaryEstimateInput, SalaryEstimateParsed } from '@/lib/salary-estimate-types';
 
 export const LSE_PANEL_ATTR = 'data-lse-salary-panel';
@@ -84,7 +85,10 @@ export function profileExperienceSectionContains(element: HTMLElement): boolean 
   return byHeading instanceof HTMLElement && byHeading.contains(element);
 }
 
-export function tryInjectSalaryPanel(displayCurrencyCode: string): InjectionResult {
+export function tryInjectSalaryPanel(
+  displayCurrencyCode: string,
+  estimateRunMode: EstimateRunMode = 'manual',
+): InjectionResult {
   const details: Record<string, unknown> = {
     path: location.pathname,
     href: location.href,
@@ -113,7 +117,7 @@ export function tryInjectSalaryPanel(displayCurrencyCode: string): InjectionResu
   if (!scope) {
     const looseLi = findLooseMostRecentRole(details);
     if (looseLi) {
-      return injectPanel(looseLi, details, 'global-recent-scan', displayCurrencyCode);
+      return injectPanel(looseLi, details, 'global-recent-scan', displayCurrencyCode, estimateRunMode);
     }
     return { success: false, reason: 'no_experience_section', details, panelEl: null };
   }
@@ -121,7 +125,7 @@ export function tryInjectSalaryPanel(displayCurrencyCode: string): InjectionResu
   if (items.length === 0) {
     const looseLi = findLooseMostRecentRole(details);
     if (looseLi) {
-      return injectPanel(looseLi, details, 'global-recent-scan', displayCurrencyCode);
+      return injectPanel(looseLi, details, 'global-recent-scan', displayCurrencyCode, estimateRunMode);
     }
     return { success: false, reason: 'no_list_items', details, panelEl: null };
   }
@@ -131,7 +135,7 @@ export function tryInjectSalaryPanel(displayCurrencyCode: string): InjectionResu
   details.mostRecentEmployerDomIndex = 0;
   details.roleMount =
     targetLi === companyRow ? 'single-role-or-unparsed-card' : 'first-nested-role-under-employer';
-  return injectPanel(targetLi, details, 'most-recent-role', displayCurrencyCode);
+  return injectPanel(targetLi, details, 'most-recent-role', displayCurrencyCode, estimateRunMode);
 }
 
 /**
@@ -152,12 +156,13 @@ function injectPanel(
   details: Record<string, unknown>,
   mode: 'most-recent-role' | 'global-recent-scan',
   displayCurrencyCode: string,
+  estimateRunMode: EstimateRunMode,
 ): InjectionResult {
   if (!profileExperienceSectionContains(li)) {
     details.rejectionReason = 'mount_outside_experience_module';
     return { success: false, reason: 'no_experience_section', details, panelEl: null };
   }
-  const panel = createPanelElement(mode, displayCurrencyCode);
+  const panel = createPanelElement(mode, displayCurrencyCode, estimateRunMode);
   const mount = findExperiencePanelMount(li);
   mount.appendChild(panel);
   details.panelMount = mount === li ? 'li' : 'inner-column';
@@ -410,23 +415,33 @@ function wireSalaryPanelExplainPopover(panel: HTMLElement, explainToggleIdAttr: 
 function createPanelElement(
   mode: 'most-recent-role' | 'global-recent-scan',
   displayCurrencyCode: string,
+  estimateRunMode: EstimateRunMode,
 ): HTMLElement {
   const host = document.createElement('aside');
   host.setAttribute(LSE_PANEL_ATTR, '');
   host.className = 'lse-panel';
   host.setAttribute('aria-label', 'Estimated compensation (extension)');
+  host.dataset.lseEstimateTrigger = estimateRunMode;
   const explainUid = `${Math.random().toString(36).slice(2, 11)}`;
   const explainToggleIdAttr = `lse-explain-t-${explainUid}`;
   const explainBodyIdAttr = `lse-explain-b-${explainUid}`;
   const ccy = escapeHtml(displayCurrencyCode);
 
+  const manualCtaHidden = estimateRunMode === 'auto';
+
   const note =
     mode === 'global-recent-scan'
       ? 'Attached via main-column scan (Experience layout non-standard).'
-      : 'Fetching a public-market estimate…';
+      : estimateRunMode === 'manual'
+        ? 'Manual mode: estimates run only after you choose Run.'
+        : 'Fetching a public-market estimate…';
 
   host.innerHTML = `
     <div class="lse-panel__header">Est. compensation <span class="lse-panel__ccy">(${ccy})</span></div>
+    <div class="lse-panel__manual" data-lse-field="manual-cta" ${manualCtaHidden ? 'hidden' : ''}>
+      <p class="lse-panel__manual-text">${estimateRunMode === 'manual' ? 'Click Run when you want an estimate.' : ''}</p>
+      <button type="button" class="lse-panel__run" data-lse-run-estimate>Run</button>
+    </div>
     <div class="lse-panel__busy" data-lse-field="busy" hidden>
       <div class="lse-panel__busy-inner">
         <div class="lse-panel__spinner" aria-hidden="true"></div>
@@ -495,6 +510,15 @@ export function beginSalaryPanelBusy(panel: HTMLElement): () => void {
   let elapsedSec = 0;
   let phaseIndex = 0;
 
+  const manualCta = panel.querySelector('[data-lse-field="manual-cta"]') as HTMLElement | null;
+  let manualPriorHidden = true;
+  if (manualCta && panel.dataset.lseEstimateTrigger === 'manual') {
+    manualPriorHidden = Boolean(manualCta.hidden);
+    if (!manualPriorHidden) {
+      manualCta.hidden = true;
+    }
+  }
+
   panel.setAttribute('aria-busy', 'true');
   panel.classList.add('lse-panel--busy', 'lse-panel--loading');
   panel.querySelector('[data-lse-field="range"]')!.textContent = '…';
@@ -549,6 +573,9 @@ export function beginSalaryPanelBusy(panel: HTMLElement): () => void {
     panel.classList.remove('lse-panel--busy', 'lse-panel--loading');
     if (busy instanceof HTMLElement) {
       busy.hidden = true;
+    }
+    if (manualCta && panel.dataset.lseEstimateTrigger === 'manual') {
+      manualCta.hidden = manualPriorHidden;
     }
   };
 }
