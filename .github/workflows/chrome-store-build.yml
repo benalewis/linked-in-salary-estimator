@@ -1,10 +1,26 @@
 # Production Chrome MV3 zip for Chrome Web Store upload.
+# - `npm run test` (Vitest) before packaging
 # - Optional semver bump (package.json → WXT manifest version)
 # - `npm run zip` = `wxt zip` (build + zip with manifest at zip root)
+# - Optional Chrome Web Store API upload + publish (submits draft for Google review).
+#
+# Store upload credentials (OAuth) — repo Settings → Secrets and variables → Actions:
+#   CHROME_WEBSTORE_EXTENSION_ID — 32-char id from Developer Dashboard URL.
+#   CHROME_WEBSTORE_CLIENT_ID      — GCP OAuth Web client ID
+#   CHROME_WEBSTORE_CLIENT_SECRET  — GCP OAuth client secret
+#   CHROME_WEBSTORE_REFRESH_TOKEN — refresh token with scope chromewebstore
+# Obtain keys: https://developer.chrome.com/docs/webstore/using-api
+# Triggers: push to `main` (build + artifact + publish) and `workflow_dispatch` (optional bump/commit;
+#   publish on manual runs only if "Publish to Chrome Web Store" is checked).
+# Optionally gate runs with repo Environment "chrome-webstore" (approvals): add near `publish:`:
+#     environment: chrome-webstore
 
 name: Chrome store bundle
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version_bump:
@@ -20,6 +36,10 @@ on:
         description: 'If a bump was applied, commit and push package.json + lockfile to this branch'
         type: boolean
         default: false
+      publish_to_chrome_web_store:
+        description: 'Manual runs only: publish after build. Every push to main also runs publish (needs secrets).'
+        type: boolean
+        default: false
 
 jobs:
   package:
@@ -27,6 +47,8 @@ jobs:
     # `write` allows optional commit+push of the version bump; artifact upload does not require it.
     permissions:
       contents: write
+    outputs:
+      extension_version: ${{ steps.ver.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,8 +60,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run tests
+        run: npm run test
+
       - name: Bump version
-        if: inputs.version_bump != 'none'
+        if: github.event_name == 'workflow_dispatch' && inputs.version_bump != 'none'
         run: npm version "${{ inputs.version_bump }}" --no-git-tag-version
 
       - name: Record extension version
@@ -57,10 +82,35 @@ jobs:
           if-no-files-found: error
 
       - name: Commit and push version bump
-        if: inputs.version_bump != 'none' && inputs.push_version_bump
+        if: github.event_name == 'workflow_dispatch' && inputs.version_bump != 'none' && inputs.push_version_bump
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json
           git commit -m "chore(release): v$(node -p "require('./package.json').version")"
           git push
+
+  publish:
+    name: Publish to Chrome Web Store
+    needs: package
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_to_chrome_web_store) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linked-in-salary-estimator-chrome-${{ needs.package.outputs.extension_version }}
+          path: chrome-zip
+
+      - name: Upload package and submit for review
+        env:
+          EXTENSION_ID: ${{ secrets.CHROME_WEBSTORE_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_WEBSTORE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_WEBSTORE_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_WEBSTORE_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          ZIP="chrome-zip/linked-in-salary-estimator-${{ needs.package.outputs.extension_version }}-chrome.zip"
+          test -f "$ZIP"
+          npx --yes chrome-webstore-upload-cli@3.5.0 --source "$ZIP"
