@@ -24,7 +24,8 @@
 param(
   [switch]$SkipBuild,
   [switch]$Dev,
-  [string]$Url = 'https://www.linkedin.com/in/ben-l-b46521230/'
+  # Use your own `/in/...` profile URL when testing Experience injection; avoid committing personal slugs.
+  [string]$Url = 'https://www.linkedin.com/feed/'
 )
 
 $ErrorActionPreference = 'Stop'

@@ -2,6 +2,7 @@
   "name": "linked-in-salary-estimator",
   "description": "LinkedIn profile salary estimates from public web data",
   "private": true,
+  "license": "MIT",
   "version": "0.0.1",
   "type": "module",
   "scripts": {
