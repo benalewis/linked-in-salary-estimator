@@ -3,7 +3,7 @@ import { LSE_PANEL_ATTR, mutationsAreOnlyInsideSalaryPanel } from '@/lib/linkedi
 
 describe('mutationsAreOnlyInsideSalaryPanel', () => {
   it('returns false when a mutation targets document body', () => {
-    const m = { target: document.body } as MutationRecord;
+    const m = { target: document.body } as unknown as MutationRecord;
     expect(mutationsAreOnlyInsideSalaryPanel([m])).toBe(false);
   });
 
@@ -13,7 +13,7 @@ describe('mutationsAreOnlyInsideSalaryPanel', () => {
     const inner = document.createElement('span');
     wrap.appendChild(inner);
     document.body.appendChild(wrap);
-    const m = { target: inner } as MutationRecord;
+    const m = { target: inner } as unknown as MutationRecord;
     expect(mutationsAreOnlyInsideSalaryPanel([m])).toBe(true);
     wrap.remove();
   });

@@ -13,6 +13,10 @@ function truncate(s: string, max: number): string {
   return t.length <= max ? t : `${t.slice(0, max)}…`;
 }
 
+function sectionPlainText(el: Element): string {
+  return (el instanceof HTMLElement ? el.innerText : el.textContent) ?? '';
+}
+
 function profileMainRoot(): Element | null {
   return queryLinkedInProfileMain(document);
 }
@@ -81,11 +85,11 @@ export function scrapeLinkedInProfileSections(): LinkedInProfileSections {
 
   const certEl = sectionByHeading(sections, /\b(certifications|licenses\s+&\s+certifications)\b/i);
 
-  const experienceSectionText = experienceEl ? truncate(experienceEl.innerText ?? '', MAX_SECTION_CHARS) : null;
-  const educationSectionText = educationEl ? truncate(educationEl.innerText ?? '', MAX_SECTION_CHARS) : null;
-  const skillsSectionText = skillsEl ? truncate(skillsEl.innerText ?? '', MAX_SECTION_CHARS) : null;
-  const aboutText = aboutEl ? truncate(aboutEl.innerText ?? '', MAX_SECTION_CHARS) : null;
-  const certificationsText = certEl ? truncate(certEl.innerText ?? '', MAX_SECTION_CHARS) : null;
+  const experienceSectionText = experienceEl ? truncate(sectionPlainText(experienceEl), MAX_SECTION_CHARS) : null;
+  const educationSectionText = educationEl ? truncate(sectionPlainText(educationEl), MAX_SECTION_CHARS) : null;
+  const skillsSectionText = skillsEl ? truncate(sectionPlainText(skillsEl), MAX_SECTION_CHARS) : null;
+  const aboutText = aboutEl ? truncate(sectionPlainText(aboutEl), MAX_SECTION_CHARS) : null;
+  const certificationsText = certEl ? truncate(sectionPlainText(certEl), MAX_SECTION_CHARS) : null;
 
   const locationLine =
     document.querySelector('main h1')?.parentElement?.querySelector('.text-body-small')?.textContent?.trim() ??

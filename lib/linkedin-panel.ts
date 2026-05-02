@@ -368,7 +368,7 @@ function wireSalaryPanelExplainPopover(panel: HTMLElement, explainToggleIdAttr: 
   toggle.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setOpen(body.hidden);
+    setOpen(!!body.hidden);
   });
 
   explainPopoverDocListeners.get(panel)?.abort();
