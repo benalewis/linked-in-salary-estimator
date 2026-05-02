@@ -29,6 +29,7 @@ vi.mock('@/lib/browser', () => ({
 import {
   ensureDefaultSettings,
   readLseSettings,
+  setEstimateRunMode,
   setUserCurrency,
 } from '@/lib/lse-settings';
 
@@ -49,13 +50,15 @@ describe('ensureDefaultSettings', () => {
   it('writes USD when nothing stored', async () => {
     const s = await ensureDefaultSettings();
     expect(s.currencyCode).toBe('USD');
-    expect((localStore[LSE_SETTINGS_KEY] as { currencyCode: string }).currencyCode).toBe('USD');
+    expect(s.estimateRunMode).toBe('manual');
+    expect(localStore[LSE_SETTINGS_KEY]).toEqual({ currencyCode: 'USD', estimateRunMode: 'manual' });
   });
 
   it('returns stored currency without overwriting', async () => {
     localStore[LSE_SETTINGS_KEY] = { currencyCode: 'EUR' };
     const s = await ensureDefaultSettings();
     expect(s.currencyCode).toBe('EUR');
+    expect(s.estimateRunMode).toBe('manual');
   });
 
   it('migrates legacy sync blob into local and reads currencyCode', async () => {
@@ -67,6 +70,7 @@ describe('ensureDefaultSettings', () => {
     };
     const s = await readLseSettings();
     expect(s?.currencyCode).toBe('CAD');
+    expect(s?.estimateRunMode).toBe('manual');
     expect(localStore[LSE_SETTINGS_KEY]).toEqual(syncStore[LSE_SETTINGS_KEY]);
   });
 });
@@ -74,16 +78,41 @@ describe('ensureDefaultSettings', () => {
 describe('setUserCurrency', () => {
   beforeEach(() => clearStores());
 
-  it('stores normalized code and persists only currency field shape', async () => {
+  it('stores normalized code and retains estimateRunMode', async () => {
     localStore[LSE_SETTINGS_KEY] = {
       currencyCode: 'USD',
       currencyIsUserChoice: false,
       geoCurrencyCode: 'EUR',
       geoLookupAt: 1,
+      estimateRunMode: 'auto',
     };
     await setUserCurrency('gbp');
     const s = await readLseSettings();
     expect(s?.currencyCode).toBe('GBP');
-    expect(localStore[LSE_SETTINGS_KEY]).toEqual({ currencyCode: 'GBP' });
+    expect(s?.estimateRunMode).toBe('auto');
+    expect(localStore[LSE_SETTINGS_KEY]).toEqual({ currencyCode: 'GBP', estimateRunMode: 'auto' });
+  });
+});
+
+describe('setEstimateRunMode', () => {
+  beforeEach(() => clearStores());
+
+  it('persists manual and auto alongside currency', async () => {
+    localStore[LSE_SETTINGS_KEY] = { currencyCode: 'CHF', estimateRunMode: 'manual' };
+    await setEstimateRunMode('auto');
+    expect(await readLseSettings()).toEqual({
+      currencyCode: 'CHF',
+      estimateRunMode: 'auto',
+    });
+    await setEstimateRunMode('manual');
+    expect(await readLseSettings()).toEqual({
+      currencyCode: 'CHF',
+      estimateRunMode: 'manual',
+    });
+  });
+
+  it('treats invalid stored estimateRunMode as manual on read', async () => {
+    localStore[LSE_SETTINGS_KEY] = { currencyCode: 'USD', estimateRunMode: 'junk' };
+    expect((await readLseSettings())?.estimateRunMode).toBe('manual');
   });
 });

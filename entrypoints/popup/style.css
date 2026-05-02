@@ -86,6 +86,39 @@ body {
   color: #636366;
 }
 
+.popup__radio-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popup__radio-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #424245;
+}
+
+.popup__radio {
+  margin-top: 2px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: #0066cc;
+  cursor: pointer;
+}
+
+.popup__radio-title {
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
 .popup__toggle-row {
   display: flex;
   align-items: flex-start;

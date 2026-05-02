@@ -157,9 +157,31 @@ describe('tryInjectSalaryPanel', () => {
     expect(r.details.matchStrategy).toBe('most-recent-role');
     expect(r.panelEl).toBeTruthy();
 
-    const panel = document.querySelector(`[${LSE_PANEL_ATTR}]`);
+    const panel = document.querySelector(`[${LSE_PANEL_ATTR}]`) as HTMLElement;
     expect(panel).toBeTruthy();
-    expect(panel?.querySelector('.lse-panel__ccy')?.textContent).toContain('CAD');
+    expect(panel.querySelector('.lse-panel__ccy')?.textContent).toContain('CAD');
+    const manualWrap = panel.querySelector('[data-lse-field="manual-cta"]') as HTMLElement | null;
+    expect(manualWrap?.hidden).toBe(false);
+    expect(panel.querySelector('[data-lse-run-estimate]')).toBeTruthy();
+    expect(panel.dataset.lseEstimateTrigger).toBe('manual');
+  });
+
+  it('auto mode hides manual Run row', () => {
+    document.body.innerHTML = `
+      <main>
+        <section>
+          <div id="experience"></div>
+          <ul>
+            <li>Software Engineer · Jan 2020 – Present · Company Inc</li>
+          </ul>
+        </section>
+      </main>`;
+
+    tryInjectSalaryPanel('USD', 'auto');
+    const panel = document.querySelector(`[${LSE_PANEL_ATTR}]`) as HTMLElement;
+    const manualWrap = panel.querySelector('[data-lse-field="manual-cta"]') as HTMLElement;
+    expect(manualWrap.hidden).toBe(true);
+    expect(panel.dataset.lseEstimateTrigger).toBe('auto');
   });
 
   it('falls back to first experience row when no Present label', () => {
@@ -220,7 +242,7 @@ describe('tryInjectSalaryPanel', () => {
     expect(hostLi?.textContent).not.toMatch(/OTC Training/);
   });
 
-  it('uses entity-collection-item card order when React omits classic list styling (Luke Edwards layout)', () => {
+  it('uses entity-collection-item card order when React omits classic list styling', () => {
     document.body.innerHTML = `
       <main>
         <section>

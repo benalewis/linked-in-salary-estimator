@@ -43,7 +43,7 @@ export default defineBackground(() => {
           })
           .catch((err: unknown) => {
             console.error('[salary-estimator] getSettings / ensureDefaultSettings failed', err);
-            sendResponse({ currencyCode: 'USD' });
+            sendResponse({ currencyCode: 'USD', estimateRunMode: 'manual' });
           });
         return true;
       }

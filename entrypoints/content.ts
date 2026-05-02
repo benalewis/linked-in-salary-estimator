@@ -1,13 +1,18 @@
 import '@/assets/linkedin-panel.css';
 import browser from '@/lib/browser';
 import { extensionContextIsStale, formatExtensionSideError } from '@/lib/extension-context';
-import { LSE_SETTINGS_KEY, type LseSettings } from '@/lib/lse-settings';
+import {
+  LSE_SETTINGS_KEY,
+  type EstimateRunMode,
+  type LseSettings,
+} from '@/lib/lse-settings';
 import type { InjectionResult } from '@/lib/linkedin-panel';
 import {
   applySalaryEstimateToPanel,
   applySalaryPanelError,
   beginSalaryPanelBusy,
   collectSalaryEstimateContext,
+  LSE_PANEL_ATTR,
   mutationsAreOnlyInsideSalaryPanel,
   removeSalaryPanel,
   resolveExperienceHostFromSalaryPanel,
@@ -46,8 +51,12 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): (.
   };
 }
 
-function digestInjection(r: InjectionResult): string {
-  return `${r.success}:${r.reason}:${JSON.stringify(r.details)}`;
+function digestInjection(
+  r: InjectionResult,
+  displayCurrencyCode: string,
+  estimateRunMode: EstimateRunMode,
+): string {
+  return `${estimateRunMode}:${displayCurrencyCode}:${r.success}:${r.reason}:${JSON.stringify(r.details)}`;
 }
 
 function logInjectOutcome(result: InjectionResult): void {
@@ -82,7 +91,8 @@ export default defineContentScript({
 
       let lastInjectDigest = '';
       let displayCurrencyCode = 'USD';
-      let currencyResolved = false;
+      let estimateRunMode: EstimateRunMode = 'manual';
+      let prefsResolved = false;
 
       const MO_OPTS: MutationObserverInit = { childList: true, subtree: true, characterData: true };
       let mo!: MutationObserver;
@@ -99,6 +109,10 @@ export default defineContentScript({
           }
           return;
         }
+        if (panelEl.dataset.lseEstimateState === 'pending') {
+          return;
+        }
+        panelEl.dataset.lseEstimateState = 'pending';
         const profileHref = location.href;
         const rowTextForCache = (experienceRow.innerText ?? '').replace(/\s+/g, ' ').trim();
         const requestId = newEstimateRequestId();
@@ -178,8 +192,8 @@ export default defineContentScript({
         }
       }
 
-      async function resolveDisplayCurrency(): Promise<void> {
-        if (currencyResolved) {
+      async function resolveContentPrefs(): Promise<void> {
+        if (prefsResolved) {
           return;
         }
         /** Safety net if the service worker never responds (should be rare after provisional defaults). */
@@ -193,26 +207,30 @@ export default defineContentScript({
           if (s && typeof s.currencyCode === 'string') {
             displayCurrencyCode = s.currencyCode;
           }
-          console.info('[salary-estimator] currency label', displayCurrencyCode);
+          if (s && (s.estimateRunMode === 'auto' || s.estimateRunMode === 'manual')) {
+            estimateRunMode = s.estimateRunMode;
+          }
+          console.info('[salary-estimator] prefs', displayCurrencyCode, estimateRunMode);
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           if (/extension context invalidated/i.test(msg)) {
             console.warn('[salary-estimator] extension context invalidated — refresh this LinkedIn tab after reloading the extension.', e);
           } else {
-            console.warn('[salary-estimator] getSettings failed — using USD for panel until background responds', e);
+            console.warn('[salary-estimator] getSettings failed — using USD + manual until background responds', e);
           }
           displayCurrencyCode = 'USD';
+          estimateRunMode = 'manual';
         }
-        currencyResolved = true;
+        prefsResolved = true;
       }
 
       const scheduleInject = debounce(() => {
         void (async () => {
           mo.disconnect();
           try {
-            await resolveDisplayCurrency();
-            const result = tryInjectSalaryPanel(displayCurrencyCode);
-            const d = digestInjection(result);
+            await resolveContentPrefs();
+            const result = tryInjectSalaryPanel(displayCurrencyCode, estimateRunMode);
+            const d = digestInjection(result, displayCurrencyCode, estimateRunMode);
             if (d !== lastInjectDigest) {
               lastInjectDigest = d;
               logInjectOutcome(result);
@@ -220,10 +238,15 @@ export default defineContentScript({
             }
             if (result.success && result.panelEl) {
               const p = result.panelEl;
-              const st = p.dataset.lseEstimateState;
-              if (st !== 'pending' && st !== 'ok') {
-                p.dataset.lseEstimateState = 'pending';
-                void requestSalaryEstimate(p, displayCurrencyCode);
+              if (estimateRunMode === 'manual') {
+                if (!p.dataset.lseEstimateState) {
+                  p.dataset.lseEstimateState = 'idle-manual';
+                }
+              } else {
+                const st = p.dataset.lseEstimateState;
+                if (st !== 'pending' && st !== 'ok') {
+                  void requestSalaryEstimate(p, displayCurrencyCode);
+                }
               }
             }
           } catch (e) {
@@ -233,6 +256,28 @@ export default defineContentScript({
           }
         })();
       }, 400);
+
+      document.addEventListener(
+        'click',
+        (e: MouseEvent) => {
+          const t = e.target;
+          const btn = t instanceof Element ? t.closest('[data-lse-run-estimate]') : null;
+          if (!(btn instanceof HTMLButtonElement)) {
+            return;
+          }
+          const panelEl = btn.closest(`[${LSE_PANEL_ATTR}]`);
+          if (!(panelEl instanceof HTMLElement)) {
+            return;
+          }
+          if (panelEl.dataset.lseEstimateState === 'pending') {
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          void requestSalaryEstimate(panelEl, displayCurrencyCode);
+        },
+        true,
+      );
 
       mo = new MutationObserver((records) => {
         if (mutationsAreOnlyInsideSalaryPanel(records)) {
@@ -249,9 +294,14 @@ export default defineContentScript({
         if (area !== 'local' || !changes[LSE_SETTINGS_KEY]) {
           return;
         }
-        const nv = changes[LSE_SETTINGS_KEY]!.newValue as { currencyCode?: string } | undefined;
+        const nv = changes[LSE_SETTINGS_KEY]!.newValue as
+          | { currencyCode?: string; estimateRunMode?: EstimateRunMode }
+          | undefined;
         if (nv && typeof nv.currencyCode === 'string') {
           displayCurrencyCode = nv.currencyCode;
+        }
+        if (nv && (nv.estimateRunMode === 'auto' || nv.estimateRunMode === 'manual')) {
+          estimateRunMode = nv.estimateRunMode;
         }
         lastInjectDigest = '';
         removeSalaryPanel();
