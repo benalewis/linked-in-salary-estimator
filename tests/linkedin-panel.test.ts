@@ -67,13 +67,13 @@ describe('resolveMostRecentPositionLi', () => {
           <li id="r2">Other · 2022</li>
         </ul>
       </li>`;
-    const card = document.querySelector('#card')!;
+    const card = document.querySelector('#card')! as HTMLElement;
     expect(resolveMostRecentPositionLi(card).id).toBe('r1');
   });
 
   it('returns the company row when there is no multi-role nested list', () => {
     document.body.innerHTML = `<li id="solo">Bank · JPM · Present</li>`;
-    const solo = document.querySelector('#solo')!;
+    const solo = document.querySelector('#solo')! as HTMLElement;
     expect(resolveMostRecentPositionLi(solo)).toBe(solo);
   });
 });
@@ -89,7 +89,7 @@ describe('findExperiencePanelMount', () => {
           </div>
         </div>
       </li>`;
-    const li = document.querySelector('li.top')!;
+    const li = document.querySelector('li.top')! as HTMLElement;
     const mount = findExperiencePanelMount(li);
     expect(mount.className).toContain('flex-column');
     expect(mount.className).toContain('flex-grow-1');
@@ -97,7 +97,7 @@ describe('findExperiencePanelMount', () => {
 
   it('falls back to the experience li when no inner column', () => {
     document.body.innerHTML = `<li class="plain">Past · 2020 – 2021</li>`;
-    const li = document.querySelector('li.plain')!;
+    const li = document.querySelector('li.plain')! as HTMLElement;
     expect(findExperiencePanelMount(li)).toBe(li);
   });
 });
