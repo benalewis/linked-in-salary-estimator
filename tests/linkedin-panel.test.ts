@@ -61,9 +61,9 @@ describe('resolveMostRecentPositionLi', () => {
   it('returns the first nested role when a card groups multiple positions', () => {
     document.body.innerHTML = `
       <li id="card">
-        <span>British Army</span>
+        <span>Example National Corps</span>
         <ul>
-          <li id="r1">University OTC Captain · 2023</li>
+          <li id="r1">Reserve Cadet Trainer · 2023</li>
           <li id="r2">Other · 2022</li>
         </ul>
       </li>`;
@@ -222,10 +222,10 @@ describe('tryInjectSalaryPanel', () => {
         <section>
           <div id="experience"></div>
           <ul>
-            <li>Banking · J.P. Morgan · Feb 2023 – Present · London</li>
-            <li>British Army · 9 yrs
+            <li>Banking · Globex Financial · Feb 2023 – Present · London</li>
+            <li>Example National Corps · 9 yrs
               <ul>
-                <li>OTC Training Captain · Part-time · Feb 2023 – May 2023</li>
+                <li>Cadet Trainer · Part-time · Feb 2023 – May 2023</li>
                 <li>Other role · 2022 – 2023</li>
               </ul>
             </li>
@@ -238,8 +238,8 @@ describe('tryInjectSalaryPanel', () => {
     expect(r.details.matchStrategy).toBe('most-recent-role');
     const panel = document.querySelector(`[${LSE_PANEL_ATTR}]`);
     const hostLi = panel?.closest('li');
-    expect(hostLi?.textContent).toMatch(/J\.P\. Morgan/);
-    expect(hostLi?.textContent).not.toMatch(/OTC Training/);
+    expect(hostLi?.textContent).toMatch(/Globex Financial/);
+    expect(hostLi?.textContent).not.toMatch(/Cadet Trainer/);
   });
 
   it('uses entity-collection-item card order when React omits classic list styling', () => {
@@ -250,20 +250,20 @@ describe('tryInjectSalaryPanel', () => {
           <div id="experience"></div>
           <ul>
             <!-- Shallow bogus list with many lis (mirrors mistaken shallowest-ul + max-li-count pick). -->
-            <li>Army nested li 1 · noise</li>
-            <li>Army nested li 2 · noise</li>
-            <li>Army nested li 3 · noise</li>
+            <li>Nested decoy row 1 · noise</li>
+            <li>Nested decoy row 2 · noise</li>
+            <li>Nested decoy row 3 · noise</li>
           </ul>
-          <div componentkey="entity-collection-item--jpm">
+          <div componentkey="entity-collection-item--globex">
             <div>
-              Senior Associate · J.P. Morgan · Present · London
+              Senior Associate · Globex Financial · Present · London
               <button type="button">more</button>
             </div>
           </div>
-          <div componentkey="entity-collection-item--army">
-            <div>British Army · 9 yrs</div>
+          <div componentkey="entity-collection-item--corps">
+            <div>Example National Corps · 9 yrs</div>
             <ul>
-              <li>University of London OTC Captain · Feb 2023 – May 2023</li>
+              <li>Metro State OTC Captain · Feb 2023 – May 2023</li>
               <li>Other nested role · 2022 – 2023</li>
             </ul>
           </div>
@@ -275,6 +275,6 @@ describe('tryInjectSalaryPanel', () => {
     expect(r.details.listStrategy).toMatch(/entity-collection-item/);
     const panelHost = document.querySelector(`[${LSE_PANEL_ATTR}]`)?.parentElement;
     const card = panelHost?.closest('[componentkey^="entity-collection-item"]');
-    expect(card?.getAttribute('componentkey')).toBe('entity-collection-item--jpm');
+    expect(card?.getAttribute('componentkey')).toBe('entity-collection-item--globex');
   });
 });
