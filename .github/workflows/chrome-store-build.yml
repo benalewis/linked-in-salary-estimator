@@ -114,3 +114,4 @@ jobs:
           ZIP="chrome-zip/linked-in-salary-estimator-${{ needs.package.outputs.extension_version }}-chrome.zip"
           test -f "$ZIP"
           npx --yes chrome-webstore-upload-cli@3.5.0 --source "$ZIP"
+ 
