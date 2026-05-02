@@ -55,7 +55,8 @@ export default defineBackground(() => {
           .catch((err: unknown) => {
             console.error('[salary-estimator] getLlmSettings failed', err);
             sendResponse({
-              geminiModel: 'gemini-2.5-flash',
+              geminiEnabled: true,
+              geminiModel: 'gemini-2.5-flash-lite',
               geminiKeyConfigured: false,
             });
           });

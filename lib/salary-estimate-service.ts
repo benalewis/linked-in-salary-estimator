@@ -18,9 +18,17 @@ export async function runSalaryEstimate(input: SalaryEstimateInput): Promise<Sal
     requestId: rid,
     provider: 'gemini',
     model: settings.geminiModel,
+    geminiEnabled: settings.geminiEnabled,
     outputCurrency: input.outputCurrency,
     experiencePreview: input.experienceRowText.slice(0, 120),
   });
+
+  if (!settings.geminiEnabled) {
+    const msg =
+      'Gemini is turned off in the extension popup. Enable it and save to run salary estimates.';
+    logLlmFlow('worker:estimate_done', { requestId: rid, ok: false, error: msg }, 'warn');
+    return { ok: false, error: msg };
+  }
 
   const attempts: Array<{ label: string; jsonObject: boolean; geminiGoogleSearch: boolean }> = [
     { label: 'json+googleSearch', jsonObject: true, geminiGoogleSearch: true },

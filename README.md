@@ -44,7 +44,7 @@ Settings are stored in **`chrome.storage.local`** (works without Chrome Sync). L
 
 LLM API keys never sync to the cloud with this storage mode. Host permission: **`https://generativelanguage.googleapis.com/*`** for the Gemini API.
 
-If the API returns *“You exceeded your current quota”* or similar, check [Gemini usage and rate limits](https://ai.google.dev/gemini-api/docs/rate-limits), billing/credits on your Google AI project, or try another model id (e.g. `gemini-2.5-flash`).
+If the API returns *“You exceeded your current quota”* or similar, check [Gemini usage and rate limits](https://ai.google.dev/gemini-api/docs/rate-limits), billing/credits on your Google AI project, or try a lighter model id (default `gemini-2.5-flash-lite`; see [pricing](https://ai.google.dev/pricing)).
 
 Load the built folder as an unpacked / temporary extension:
 

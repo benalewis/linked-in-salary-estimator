@@ -5,7 +5,7 @@
 export function friendlyLlmErrorMessage(message: string): string {
   const m = message.trim();
   if (/exceeded your current quota|insufficient_quota|billing hard limit/i.test(m)) {
-    return 'Quota or billing issue — check Google AI / Gemini usage limits and billing, or try another model (e.g. gemini-2.5-flash).';
+    return 'Quota or billing issue — check Google AI / Gemini usage limits and billing, or try a lighter model (e.g. gemini-2.5-flash-lite).';
   }
   if (/API key not valid|API_KEY_INVALID|401|permission denied/i.test(m)) {
     return 'Gemini API key rejected — create or rotate a key in Google AI Studio (aistudio.google.com/apikey).';

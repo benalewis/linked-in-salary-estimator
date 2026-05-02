@@ -65,15 +65,20 @@ function mount(currency: LseSettings, llm: LlmSettingsView): void {
         <p class="popup__text popup__text--small">
           Paste an API key from <a class="popup__link" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Google AI Studio</a>.
           Keys stay in this browser only (<code class="popup__code">storage.local</code>).
-          If you hit quota or deprecation errors, try another model id (e.g. <code class="popup__code">gemini-2.5-flash</code>) — see
+          Default model <code class="popup__code">gemini-2.5-flash-lite</code> is the budget 2.5 tier; upgrade to <code class="popup__code">gemini-2.5-flash</code> for heavier reasoning.
+          See <a class="popup__link" href="https://ai.google.dev/pricing" target="_blank" rel="noreferrer">pricing</a> and
           <a class="popup__link" href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noreferrer">rate limits</a>.
         </p>
+        <div class="popup__toggle-row">
+          <input type="checkbox" id="lse-gemini-enabled" class="popup__toggle-input" />
+          <label class="popup__toggle-label" for="lse-gemini-enabled">Enable Gemini (salary estimates &amp; test)</label>
+        </div>
         <label class="popup__label" for="lse-gemini-key">Gemini API key</label>
         <input id="lse-gemini-key" class="popup__input" type="password" autocomplete="off" spellcheck="false"
           placeholder="" />
         <label class="popup__label" for="lse-gemini-model">Model id</label>
         <input id="lse-gemini-model" class="popup__input" type="text" autocomplete="off"
-          placeholder="gemini-2.5-flash" />
+          placeholder="gemini-2.5-flash-lite" />
 
         <p class="popup__hint" id="lse-llm-status" role="status"></p>
         <button type="button" class="popup__btn popup__btn--secondary" id="lse-llm-test">Test LLM connection</button>
@@ -100,15 +105,30 @@ function mount(currency: LseSettings, llm: LlmSettingsView): void {
     hint.textContent = currencyHint();
   });
 
+  const geminiEnabled = app.querySelector('#lse-gemini-enabled') as HTMLInputElement;
   const geminiKey = app.querySelector('#lse-gemini-key') as HTMLInputElement;
   const geminiModel = app.querySelector('#lse-gemini-model') as HTMLInputElement;
+  const llmTestBtn = app.querySelector('#lse-llm-test') as HTMLButtonElement;
   const llmStatus = app.querySelector('#lse-llm-status') as HTMLParagraphElement;
 
+  geminiEnabled.checked = llm.geminiEnabled;
   geminiModel.value = llm.geminiModel;
   geminiKey.placeholder = llm.geminiKeyConfigured ? 'Key saved — enter new to replace' : 'Paste API key';
 
+  const syncLlmControlDisabled = (): void => {
+    const on = geminiEnabled.checked;
+    geminiKey.disabled = !on;
+    geminiModel.disabled = !on;
+    llmTestBtn.disabled = !on;
+  };
+  syncLlmControlDisabled();
+  geminiEnabled.addEventListener('change', () => {
+    syncLlmControlDisabled();
+  });
+
   const saveLlm = async (): Promise<LlmSettingsView> => {
     const patch: Partial<LlmStoredSettings> = {
+      geminiEnabled: geminiEnabled.checked,
       geminiModel: geminiModel.value.trim(),
     };
     const gk = geminiKey.value.trim();
@@ -120,6 +140,8 @@ function mount(currency: LseSettings, llm: LlmSettingsView): void {
     Object.assign(llm, next);
     geminiKey.value = '';
     geminiKey.placeholder = llm.geminiKeyConfigured ? 'Key saved — enter new to replace' : 'Paste API key';
+    geminiEnabled.checked = next.geminiEnabled;
+    syncLlmControlDisabled();
     return next;
   };
 
@@ -134,8 +156,8 @@ function mount(currency: LseSettings, llm: LlmSettingsView): void {
     }
   });
 
-  app.querySelector('#lse-llm-test')!.addEventListener('click', async () => {
-    const btn = app.querySelector('#lse-llm-test') as HTMLButtonElement;
+  llmTestBtn.addEventListener('click', async () => {
+    const btn = llmTestBtn;
     btn.disabled = true;
     llmStatus.textContent = 'Testing…';
     try {
@@ -152,7 +174,7 @@ function mount(currency: LseSettings, llm: LlmSettingsView): void {
     } catch (e) {
       llmStatus.textContent = `Error: ${friendlyLlmErrorMessage(e instanceof Error ? e.message : String(e))}`;
     } finally {
-      btn.disabled = false;
+      syncLlmControlDisabled();
     }
   });
 }

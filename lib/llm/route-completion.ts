@@ -18,6 +18,11 @@ export async function routeLlmCompletion(
   if (!p) {
     throw new Error('Empty prompt');
   }
+  if (!settings.geminiEnabled) {
+    throw new Error(
+      'Gemini is turned off in the extension popup. Enable it to run salary estimates or the connection test.',
+    );
+  }
   if (!settings.geminiApiKey.trim()) {
     throw new Error('Configure a Gemini API key in the extension popup (Google AI Studio).');
   }
