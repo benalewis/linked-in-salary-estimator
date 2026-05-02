@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy — LinkedIn Salary Estimator</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 42rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      small {
+        color: #444;
+      }
+      ul {
+        padding-left: 1.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Privacy Policy — LinkedIn Salary Estimator</h1>
+    <p><small>Effective date: <!-- UPDATE -->2026-05-02<!-- /UPDATE -->. This page describes the Chrome extension “LinkedIn Salary Estimator.”</small></p>
+
+    <p>
+      This extension is developed independently and is not affiliated with or endorsed by LinkedIn or Google.
+      If you choose to use optional AI features, you also rely on Google’s services under their terms and privacy policy.
+    </p>
+
+    <h2>What we do not operate</h2>
+    <p>
+      We do not run our own servers to collect, store, or sell your personal data for this extension. There is no account
+      sign-up in the extension and no analytics SDK controlled by the developer embedded for tracking.
+    </p>
+
+    <h2>Data stored on your device</h2>
+    <p>The extension may store the following in your browser using <strong>chrome.storage.local</strong> (local to this profile):</p>
+    <ul>
+      <li>Display preferences (for example, chosen currency for labels).</li>
+      <li>
+        If you choose to enter one: a <strong>Google Gemini API key</strong> and optional model id. This is treated as a
+        secret credential and is kept in local extension storage; it is not intentionally transmitted to servers operated by
+        the extension developer.
+      </li>
+      <li>
+        Cached estimate responses or related small payloads so repeat visits may avoid repeating identical requests where
+        implemented.
+      </li>
+    </ul>
+
+    <h2>Website content processed on LinkedIn pages</h2>
+    <p>
+      On LinkedIn profile pages you visit, the extension reads <strong>public page content visible in the DOM</strong> as
+      needed to render the injected panel (for example, role titles, employers, dates, summaries). Processing occurs in the
+      context of pages you have opened.
+    </p>
+
+    <h2>Optional use of Google Gemini (third party)</h2>
+    <p>
+      When you configure a Gemini API key, the extension’s service worker sends <strong>HTTPS requests</strong> to
+      <strong>Google’s Generative Language API</strong> (<code>generativelanguage.googleapis.com</code>) with prompts and
+      related context needed to generate text. That may include excerpts derived from the LinkedIn page you are viewing.
+    </p>
+    <p>
+      Those requests are governed by <strong>Google’s</strong> policies and your Google account. Review
+      <a href="https://policies.google.com/privacy" rel="noreferrer">Google’s Privacy Policy</a> and
+      <a href="https://ai.google.dev/gemini-api/terms" rel="noreferrer">Gemini API terms</a> as applicable.
+    </p>
+
+    <h2>Chrome Web Store “data usage” alignment</h2>
+    <p>
+      For transparency with the Chrome Web Store data disclosure form, this extension may handle <strong>authentication
+      information</strong> (your user-supplied API key) and <strong>website content</strong> (public LinkedIn page text in
+      open tabs) as described above. It does not intentionally collect a browsing history list, health data, payment card data,
+      or personal communications content for developer-side processing.
+    </p>
+
+    <h2>Children</h2>
+    <p>This extension is not directed at children under 13, and we do not knowingly collect data from them.</p>
+
+    <h2>Changes</h2>
+    <p>
+      We may update this policy when the extension changes. The “effective date” at the top will be revised when meaningful
+      updates are made.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Questions about this policy:
+      <a href="https://github.com/benalewis/linked-in-salary-estimator/issues" rel="noreferrer">GitHub Issues</a>
+      for this project.
+    </p>
+  </body>
+</html>

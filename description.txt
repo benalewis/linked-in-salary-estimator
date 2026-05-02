@@ -1,0 +1,28 @@
+=== Chrome Web Store: short summary (manifest.description, max 132 characters) ===
+
+Estimates salary & total comp by your LinkedIn role using optional Gemini (your key, local-only). Figures are illustrative, not from LinkedIn.
+
+
+=== Chrome Web Store: detailed description (Store listing) ===
+
+LinkedIn Salary Estimator adds a small panel beside your Experience rows on LinkedIn profile pages (linkedin.com/in/…). It summarizes estimated compensation (salary band and modeled total compensation where that makes sense).
+
+Important
+
+These numbers are estimates from public-web style reasoning—job posts, benchmarks, surveys, similar roles—not from LinkedIn, employers, payroll, or private data. Treat them as illustrative; they may be incomplete or inaccurate.
+
+How it uses AI (optional)
+
+If you paste a Google Gemini API key in the extension popup, the extension calls Google’s Generative Language API to help produce summaries. Keys are saved only in this browser (extension local storage) and do not sync via Chrome Sync to Google’s servers through this mechanism. Bring your own key from Google AI Studio; usage is subject to your Google account and quotas.
+
+If you skip the API key, the extension does not call Gemini until you configure one.
+
+Privacy & data
+
+The extension interacts with LinkedIn profile pages where you browse. It sends prompts and related context to Gemini only when you use features that invoke the configured API.
+
+Disclaimer
+
+LinkedIn® is a trademark of Microsoft Corp. This project is independent and not endorsed by or affiliated with LinkedIn or Google.
+
+Early versions may iterate on UX and wording; listings and estimates may change across releases.
