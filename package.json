@@ -1,0 +1,32 @@
+{
+  "name": "linked-in-salary-estimator",
+  "description": "LinkedIn profile salary estimates from public web data",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox --mv3",
+    "dev:edge": "wxt -b edge",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox --mv3",
+    "build:edge": "wxt build -b edge",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox --mv3",
+    "zip:edge": "wxt zip -b edge",
+    "compile": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "webextension-polyfill": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/webextension-polyfill": "^0.12.3",
+    "happy-dom": "^20.0.10",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "wxt": "^0.20.25"
+  }
+}
