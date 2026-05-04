@@ -3,6 +3,7 @@ import browser from '@/lib/browser';
 import { extensionContextIsStale, formatExtensionSideError } from '@/lib/extension-context';
 import {
   LSE_SETTINGS_KEY,
+  normalizeEstimateRunMode,
   type EstimateRunMode,
   type LseSettings,
 } from '@/lib/lse-settings';
@@ -25,6 +26,7 @@ import {
   writeCachedSalaryEstimate,
 } from '@/lib/salary-estimate-cache';
 import type { SalaryEstimateInput, SalaryEstimateWorkerResult } from '@/lib/salary-estimate-types';
+import { mouseEventTargetElement } from '@/lib/event-target';
 import { lseDbg, lseDebugEnabled } from '@/lib/lse-debug';
 
 function newEstimateRequestId(): string {
@@ -100,6 +102,11 @@ export default defineContentScript({
       async function requestSalaryEstimate(panelEl: HTMLElement, ccy: string): Promise<void> {
         const experienceRow = resolveExperienceHostFromSalaryPanel(panelEl);
         if (!(experienceRow instanceof HTMLElement)) {
+          applySalaryPanelError(
+            panelEl,
+            'Could not tie this panel to an Experience row. Scroll the role into view and try Run again.',
+          );
+          panelEl.dataset.lseEstimateState = 'error';
           return;
         }
         if (extensionContextIsStale()) {
@@ -207,9 +214,7 @@ export default defineContentScript({
           if (s && typeof s.currencyCode === 'string') {
             displayCurrencyCode = s.currencyCode;
           }
-          if (s && (s.estimateRunMode === 'auto' || s.estimateRunMode === 'manual')) {
-            estimateRunMode = s.estimateRunMode;
-          }
+          estimateRunMode = normalizeEstimateRunMode(s?.estimateRunMode);
           console.info('[salary-estimator] prefs', displayCurrencyCode, estimateRunMode);
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -238,15 +243,14 @@ export default defineContentScript({
             }
             if (result.success && result.panelEl) {
               const p = result.panelEl;
-              if (estimateRunMode === 'manual') {
-                if (!p.dataset.lseEstimateState) {
-                  p.dataset.lseEstimateState = 'idle-manual';
-                }
-              } else {
+              // Only explicit 'auto' starts a request; any other value (including undefined) must stay idle.
+              if (estimateRunMode === 'auto') {
                 const st = p.dataset.lseEstimateState;
                 if (st !== 'pending' && st !== 'ok') {
                   void requestSalaryEstimate(p, displayCurrencyCode);
                 }
+              } else if (!p.dataset.lseEstimateState) {
+                p.dataset.lseEstimateState = 'idle-manual';
               }
             }
           } catch (e) {
@@ -260,8 +264,7 @@ export default defineContentScript({
       document.addEventListener(
         'click',
         (e: MouseEvent) => {
-          const t = e.target;
-          const btn = t instanceof Element ? t.closest('[data-lse-run-estimate]') : null;
+          const btn = mouseEventTargetElement(e)?.closest('[data-lse-run-estimate]');
           if (!(btn instanceof HTMLButtonElement)) {
             return;
           }
@@ -300,8 +303,8 @@ export default defineContentScript({
         if (nv && typeof nv.currencyCode === 'string') {
           displayCurrencyCode = nv.currencyCode;
         }
-        if (nv && (nv.estimateRunMode === 'auto' || nv.estimateRunMode === 'manual')) {
-          estimateRunMode = nv.estimateRunMode;
+        if (nv) {
+          estimateRunMode = normalizeEstimateRunMode(nv.estimateRunMode);
         }
         lastInjectDigest = '';
         removeSalaryPanel();

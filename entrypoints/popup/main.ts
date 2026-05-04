@@ -39,15 +39,26 @@ function currencyHint(): string {
 }
 
 async function loadCurrencySettings(): Promise<LseSettings> {
-  return (await browser.runtime.sendMessage(MSG_GET_SETTINGS)) as LseSettings;
+  const raw = (await browser.runtime.sendMessage(MSG_GET_SETTINGS)) as Partial<LseSettings> | undefined;
+  return {
+    currencyCode: typeof raw?.currencyCode === 'string' ? raw.currencyCode : 'USD',
+    estimateRunMode: raw?.estimateRunMode === 'auto' ? 'auto' : 'manual',
+  };
 }
 
 async function loadLlmView(): Promise<LlmSettingsView> {
   return toLlmSettingsView(await readLlmSettingsFull());
 }
 
-function mount(currency: LseSettings, llm: LlmSettingsView): void {
+function mount(incoming: LseSettings, llm: LlmSettingsView): void {
+  const currency: LseSettings = {
+    currencyCode: typeof incoming.currencyCode === 'string' ? incoming.currencyCode : 'USD',
+    estimateRunMode: incoming.estimateRunMode === 'auto' ? 'auto' : 'manual',
+  };
   const app = document.querySelector('#app')!;
+
+  const manualChecked = currency.estimateRunMode === 'manual' ? ' checked' : '';
+  const autoChecked = currency.estimateRunMode === 'auto' ? ' checked' : '';
 
   app.innerHTML = `
     <main class="popup">
@@ -65,11 +76,11 @@ function mount(currency: LseSettings, llm: LlmSettingsView): void {
         <p class="popup__text popup__text--small">Applies on every LinkedIn profile you open.</p>
         <div class="popup__radio-stack" role="radiogroup" aria-labelledby="lse-run-heading">
           <label class="popup__radio-row">
-            <input type="radio" name="lse-estimate-run" value="manual" id="lse-run-manual" class="popup__radio" />
+            <input type="radio" name="lse-estimate-run" value="manual" id="lse-run-manual" class="popup__radio"${manualChecked} />
             <span><strong class="popup__radio-title">Manual (default)</strong> — Panel shows “Run”; no request until you click it.</span>
           </label>
           <label class="popup__radio-row">
-            <input type="radio" name="lse-estimate-run" value="auto" id="lse-run-auto" class="popup__radio" />
+            <input type="radio" name="lse-estimate-run" value="auto" id="lse-run-auto" class="popup__radio"${autoChecked} />
             <span><strong class="popup__radio-title">Auto</strong> — Start the estimate as soon as the panel appears (cached results still apply).</span>
           </label>
         </div>

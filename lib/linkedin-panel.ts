@@ -427,7 +427,10 @@ function createPanelElement(
   const explainBodyIdAttr = `lse-explain-b-${explainUid}`;
   const ccy = escapeHtml(displayCurrencyCode);
 
-  const manualCtaHidden = estimateRunMode === 'auto';
+  const manualHint =
+    estimateRunMode === 'manual'
+      ? 'Click Run when you want an estimate.'
+      : 'An estimate starts automatically when this panel appears. Click Run to refresh.';
 
   const note =
     mode === 'global-recent-scan'
@@ -438,8 +441,8 @@ function createPanelElement(
 
   host.innerHTML = `
     <div class="lse-panel__header">Est. compensation <span class="lse-panel__ccy">(${ccy})</span></div>
-    <div class="lse-panel__manual" data-lse-field="manual-cta" ${manualCtaHidden ? 'hidden' : ''}>
-      <p class="lse-panel__manual-text">${estimateRunMode === 'manual' ? 'Click Run when you want an estimate.' : ''}</p>
+    <div class="lse-panel__manual" data-lse-field="manual-cta">
+      <p class="lse-panel__manual-text">${escapeHtml(manualHint)}</p>
       <button type="button" class="lse-panel__run" data-lse-run-estimate>Run</button>
     </div>
     <div class="lse-panel__busy" data-lse-field="busy" hidden>

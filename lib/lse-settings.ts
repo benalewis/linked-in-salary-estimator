@@ -17,7 +17,8 @@ export type LseSettings = {
  * One-time migration: if local is empty but legacy `storage.sync` has settings, copy to local.
  * Legacy objects may include geo fields; only `currencyCode` is read.
  */
-function normalizeEstimateRunMode(v: unknown): EstimateRunMode {
+/** Coerce stored / message values: only the literal `'auto'` enables auto-run; everything else is manual. */
+export function normalizeEstimateRunMode(v: unknown): EstimateRunMode {
   return v === 'auto' ? 'auto' : 'manual';
 }
 
@@ -69,6 +70,14 @@ export async function writeLseSettings(s: LseSettings): Promise<void> {
 export async function ensureDefaultSettings(): Promise<LseSettings> {
   const existing = await readLseSettings();
   if (existing) {
+    const bag = await browser.storage.local.get(LSE_SETTINGS_KEY);
+    const rawLocal = bag[LSE_SETTINGS_KEY];
+    if (rawLocal && typeof rawLocal === 'object') {
+      const o = rawLocal as Record<string, unknown>;
+      if (o.estimateRunMode !== 'auto' && o.estimateRunMode !== 'manual') {
+        await writeLseSettings(existing);
+      }
+    }
     return existing;
   }
 

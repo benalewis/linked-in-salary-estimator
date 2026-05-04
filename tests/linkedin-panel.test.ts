@@ -166,7 +166,7 @@ describe('tryInjectSalaryPanel', () => {
     expect(panel.dataset.lseEstimateTrigger).toBe('manual');
   });
 
-  it('auto mode hides manual Run row', () => {
+  it('auto mode still shows Run (refresh) and auto hint', () => {
     document.body.innerHTML = `
       <main>
         <section>
@@ -180,7 +180,9 @@ describe('tryInjectSalaryPanel', () => {
     tryInjectSalaryPanel('USD', 'auto');
     const panel = document.querySelector(`[${LSE_PANEL_ATTR}]`) as HTMLElement;
     const manualWrap = panel.querySelector('[data-lse-field="manual-cta"]') as HTMLElement;
-    expect(manualWrap.hidden).toBe(true);
+    expect(manualWrap.hidden).toBe(false);
+    expect(panel.querySelector('[data-lse-run-estimate]')).toBeTruthy();
+    expect(panel.querySelector('.lse-panel__manual-text')?.textContent).toMatch(/automatically/i);
     expect(panel.dataset.lseEstimateTrigger).toBe('auto');
   });
 

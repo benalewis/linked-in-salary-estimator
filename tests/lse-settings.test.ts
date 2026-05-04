@@ -28,6 +28,7 @@ vi.mock('@/lib/browser', () => ({
 
 import {
   ensureDefaultSettings,
+  normalizeEstimateRunMode,
   readLseSettings,
   setEstimateRunMode,
   setUserCurrency,
@@ -54,11 +55,19 @@ describe('ensureDefaultSettings', () => {
     expect(localStore[LSE_SETTINGS_KEY]).toEqual({ currencyCode: 'USD', estimateRunMode: 'manual' });
   });
 
-  it('returns stored currency without overwriting', async () => {
+  it('returns stored currency and persists canonical estimateRunMode when missing', async () => {
     localStore[LSE_SETTINGS_KEY] = { currencyCode: 'EUR' };
     const s = await ensureDefaultSettings();
     expect(s.currencyCode).toBe('EUR');
     expect(s.estimateRunMode).toBe('manual');
+    expect(localStore[LSE_SETTINGS_KEY]).toEqual({ currencyCode: 'EUR', estimateRunMode: 'manual' });
+  });
+
+  it('rewrites invalid stored estimateRunMode to canonical manual', async () => {
+    localStore[LSE_SETTINGS_KEY] = { currencyCode: 'USD', estimateRunMode: 'junk' };
+    const s = await ensureDefaultSettings();
+    expect(s.estimateRunMode).toBe('manual');
+    expect(localStore[LSE_SETTINGS_KEY]).toEqual({ currencyCode: 'USD', estimateRunMode: 'manual' });
   });
 
   it('migrates legacy sync blob into local and reads currencyCode', async () => {
@@ -72,6 +81,16 @@ describe('ensureDefaultSettings', () => {
     expect(s?.currencyCode).toBe('CAD');
     expect(s?.estimateRunMode).toBe('manual');
     expect(localStore[LSE_SETTINGS_KEY]).toEqual(syncStore[LSE_SETTINGS_KEY]);
+  });
+});
+
+describe('normalizeEstimateRunMode', () => {
+  it("treats only literal 'auto' as auto", () => {
+    expect(normalizeEstimateRunMode('auto')).toBe('auto');
+    expect(normalizeEstimateRunMode('manual')).toBe('manual');
+    expect(normalizeEstimateRunMode(undefined)).toBe('manual');
+    expect(normalizeEstimateRunMode('Auto')).toBe('manual');
+    expect(normalizeEstimateRunMode('junk')).toBe('manual');
   });
 });
 
